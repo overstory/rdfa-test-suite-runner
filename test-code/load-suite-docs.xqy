@@ -13,21 +13,18 @@ PREFIX mf: <http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#>
 PREFIX qt: <http://www.w3.org/2001/sw/DataAccess/tests/test-query#>
 PREFIX test: <http://www.w3.org/2006/03/test-description#>
 
-SELECT DISTINCT ?name ?comment ?specref ?query ?data ?expected
+SELECT DISTINCT ?name ?comment ?query ?data ?expected
   WHERE
   {
     ?test a mf:QueryEvaluationTest.
     ?test mf:name ?name.
     ?test rdfs:comment ?comment.
     ?test mf:action ?action.
-    ?test test:specificationReference ?specref.
       ?action qt:query ?query.
       ?action qt:data ?data.
     ?test mf:result ?expected.
- 
   }
   ORDER BY ASC(?data)
-  
 ';
 
 declare variable $xml-options :=
@@ -51,6 +48,8 @@ declare variable $rdfa-info-url-root := "http://rdfa.info";
 declare variable $rdfa-info-url-full := 'http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/';
 
 declare variable $DATA-MESH-URI-SPACE-ROOT := "http://data.overstory.co.uk/resources/";
+
+declare variable $output-to-html-xslt := xdmp:document-get("/output-xml-to-html.xsl");
 
 
 declare function local:get-data (
@@ -86,9 +85,11 @@ declare function local:load-manifest(
 (:local:load-manifest($manifest-url),:)
 
 (: run sparql on the loaded manifest :)
+
+declare variable $output := 
 <output>
 {
-for $result in sem:sparql ($q) [1]
+for $result in sem:sparql ($q) 
 let $xml-uri := fn:string (map:get ($result, "data"))
 let $xml-doc-uri := fn:substring-after ($xml-uri, $rdfa-info-url-root)
 let $xml := local:get-data ($xml-uri)
@@ -113,10 +114,10 @@ return (
         return
         (
             (: REMOVE DEBUG WHEN DONE :)
-            <sparql>{$sparql}</sparql>,
+            (:<sparql>{$sparql}</sparql>,
             <input-xml>{$xml}</input-xml>,
             <rdf>{$output-rdf}</rdf>,
-            <triples>{$ml-triples}</triples>,
+            <triples>{$ml-triples}</triples>,:)
             <sparql-result>
             {
                 $sparql-result
@@ -138,11 +139,11 @@ return (
         <sparql-result>{"false - exception"}</sparql-result>,
         <test-result>{
             if (xs:boolean($expected-result)=fn:false()) 
-                then ( "PASSED", $e )
+                then ( "PASSED" )
                 else(
                 (: REMOVE WHEN DONE :)
                 (:$e:)
-                "FAILED", $e
+                "FAILED"
                 )
             }
         </test-result>
@@ -153,4 +154,7 @@ return (
 </entry>
 ) 
 }
-</output>
+</output>;
+
+xdmp:xslt-invoke('/output-xml-to-html.xsl', $output)
+
