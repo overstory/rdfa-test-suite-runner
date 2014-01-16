@@ -96,44 +96,60 @@ let $sparql := xdmp:document-get ($sparql-uri, $text-options)/text()
 let $current-test-number := fn:substring-before(fn:substring-after($xml-uri, $rdfa-info-url-full), '.xml')
 let $expected-result := fn:string(map:get ($result, "expected"))
 
+(: remove when done :)
+let $counter := 0
+
 return (
-    <test-number>{$current-test-number}</test-number>,
-    <expected>{$expected-result}</expected>,
+<entry>
+    <counter>{$counter+1}</counter>
+    <test-number>{$current-test-number}</test-number>
+    <expected>{$expected-result}</expected>
     <result>
     {
     try {
-    let $output-rdf := rdfa:parse_rdfa($xml, $xml-uri)
-    let $ml-triples := sem:rdf-parse($output-rdf, "rdfxml")
-    return
-    (
-        (:<sparql>{$sparql}</sparql>,
-        <input-xml>{$xml}</input-xml>,
-        <rdf>{$output-rdf}</rdf>,
-        <triples>{$ml-triples}</triples>,:)
-        <got>
-        {
-        sem:sparql-triples($sparql, $ml-triples)
-         }
-        </got>
-        
-        
-    )
+        let $output-rdf := rdfa:parse_rdfa($xml, $xml-uri)
+        let $ml-triples := sem:rdf-parse($output-rdf, "rdfxml")
+        let $sparql-result := sem:sparql-triples($sparql, $ml-triples)
+        return
+        (
+            (: REMOVE DEBUG WHEN DONE :)
+            (:<sparql>{$sparql}</sparql>,
+            <input-xml>{$xml}</input-xml>,
+            <rdf>{$output-rdf}</rdf>,
+            <triples>{$ml-triples}</triples>,:)
+            <sparql-result>
+            {
+                $sparql-result
+             }
+            </sparql-result>
+            ,
+            <test-result>
+            {
+                if (xs:boolean($expected-result)=$sparql-result)
+                    then( "PASSED" )
+                    else( "FAILED" )
+            }
+            </test-result>
+            
+            
+        )
     } catch($e)
     {
-        <got>{"false"}</got>,
-        <test>{
-            if ($expected-result='false') 
+        <sparql-result>{"false"}</sparql-result>,
+        <test-result>{
+            if (xs:boolean($expected-result)=fn:false()) 
                 then ( "PASSED" )
-                else()
+                else(
+                (: REMOVE WHEN DONE :)
+                $e
+                )
             }
-        </test>,
-        (: REMOVE ME WHEN THE THING IS DONE :)
-        <e>
-            {$e}
-        </e>
+        </test-result>
+
     }
     }
     </result>
+</entry>
 ) 
 }
 </output>
