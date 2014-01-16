@@ -22,7 +22,7 @@ $(function ()
             backgroundColor: ''
         },
         title: {
-            text: 'Results'
+            text: 'RDFa Suite Test Results'
         },
 
         plotOptions: {
@@ -41,13 +41,7 @@ $(function ()
 
         series: [{
             type: 'pie',
-            name: 'Result',
-            data:
-                    [
-                        ['Pass', 5 ],
-                        ['Fail', 4 ],
-                        ['Error', 2 ]
-                    ]
+            name: 'Count'
     }]
 });
 });
