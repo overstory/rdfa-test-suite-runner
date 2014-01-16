@@ -24,7 +24,9 @@ SELECT DISTINCT ?name ?comment ?specref ?query ?data ?expected
       ?action qt:query ?query.
       ?action qt:data ?data.
     ?test mf:result ?expected.
+ 
   }
+  ORDER BY ASC(?data)
   
 ';
 
@@ -86,7 +88,7 @@ declare function local:load-manifest(
 (: run sparql on the loaded manifest :)
 <output>
 {
-for $result in sem:sparql ($q) [10]
+for $result in sem:sparql ($q) [1]
 let $xml-uri := fn:string (map:get ($result, "data"))
 let $xml-doc-uri := fn:substring-after ($xml-uri, $rdfa-info-url-root)
 let $xml := local:get-data ($xml-uri)
@@ -136,7 +138,7 @@ return (
         <sparql-result>{"false - exception"}</sparql-result>,
         <test-result>{
             if (xs:boolean($expected-result)=fn:false()) 
-                then ( "PASSED" )
+                then ( "PASSED", $e )
                 else(
                 (: REMOVE WHEN DONE :)
                 (:$e:)
