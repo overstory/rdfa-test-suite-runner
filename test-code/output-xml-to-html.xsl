@@ -3,9 +3,9 @@
     xmlns:xs="http://www.w3.org/2001/XMLSchema"
     exclude-result-prefixes="xs"
     version="2.0">
-    
 
-    
+
+
     <xsl:template match="output">
         <xsl:variable name="pass">
             <xsl:variable name="pass-number" select="count(//test-result[contains(lower-case(.),'passed')])"/>
@@ -18,7 +18,7 @@
                 </xsl:otherwise>
             </xsl:choose>
         </xsl:variable>
-        
+
         <xsl:variable name="fail">
             <xsl:variable name="fail-number" select="count(//test-result[contains(lower-case(.),'failed')])"/>
             <xsl:choose>
@@ -30,16 +30,29 @@
                 </xsl:otherwise>
             </xsl:choose>
         </xsl:variable>
-        
+
+        <xsl:variable name="error">
+            <xsl:variable name="error-number" select="count(//test-result[contains(lower-case(.),'error')])"/>
+            <xsl:choose>
+                <xsl:when test="$error-number=0">
+                    <xsl:text>0</xsl:text>
+                </xsl:when>
+                <xsl:otherwise>
+                    <xsl:value-of select="$error-number"/>
+                </xsl:otherwise>
+            </xsl:choose>
+        </xsl:variable>
+
         <xsl:variable name="data">
-            data: 
+            data:
             [
                 ['Pass', <xsl:value-of select="$pass"/> ],
-                ['Fail', <xsl:value-of select="$fail"/> ]
+                ['Fail', <xsl:value-of select="$fail"/> ],
+                ['Error', <xsl:value-of select="$error"/> ]
             ]
         </xsl:variable>
-        
-        
+
+
         <html xmlns="http://www.w3.org/1999/xhtml">
             <head>
                 <title>RDFa Test Suite Result</title>
@@ -47,9 +60,23 @@
                 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
                 <script src="http://code.highcharts.com/highcharts.js"></script>
                 <script>
-                    $(function () { 
-                    $('#graph-container').highcharts({
-                    chart: {
+                    $(function () {
+
+					Highcharts.getOptions().colors = Highcharts.map(Highcharts.getOptions().colors, function(color) {
+					return {
+					radialGradient: { cx: 0.5, cy: 0.3, r: 0.7 },
+					stops: [
+					[0, color],
+					[1, Highcharts.Color(color).brighten(-0.3).get('rgb')] // darken
+					]
+					};
+					});
+
+					$('#graph-container').highcharts({
+
+					colors: [ '#00cc00', '#cccc00', '#cc0000' ],
+
+					chart: {
                     type: 'pie',
                     borderColor: '#66aaaa',
                     borderWidth: 1,
@@ -58,7 +85,7 @@
                     title: {
                     text: 'Results'
                     },
-                    
+
                     plotOptions: {
                     pie: {
                     allowPointSelect: true,
@@ -71,8 +98,8 @@
                     }
                     }
                     },
-                    
-                    
+
+
                     series: [{
                     type: 'pie',
                     name: 'Result',
@@ -91,9 +118,9 @@
                     <div id="graph-container" style="width:80%; height:0px;"></div>
                 </p>
             </body>
-            
+
         </html>
-        
+
     </xsl:template>
-    
+
 </xsl:stylesheet>
