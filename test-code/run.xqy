@@ -1,5 +1,7 @@
 xquery version '1.0-ml';
 
+declare namespace json="http://marklogic.com/xdmp/json";
+
 import module namespace sem = "http://marklogic.com/semantics" at "/MarkLogic/semantics.xqy";
 
 import module namespace rdfa="http://marklogic.com/ns/rdfa-impl#" at "rdfa.xqy";
@@ -51,7 +53,7 @@ declare variable $DATA-MESH-URI-SPACE-ROOT := "http://data.overstory.co.uk/resou
 
 declare variable $output-to-html-xslt := xdmp:document-get("/output-xml-to-html.xsl");
 
-declare variable $pass-fail-map := map:map();
+(: declare variable $pass-fail-map := map:map(); :)
 
 
 declare function local:load-doc-from-uri (
@@ -94,8 +96,7 @@ declare function local:count-result (
 };
 
 declare function local:run-tests (
-	$sparql as xs:string,
-	$pass-fail-map as map:map
+	$sparql as xs:string
 ) as element(test)*
 {
 	for $result in sem:sparql ($sparql)
@@ -120,8 +121,8 @@ declare function local:run-tests (
 			let $ml-triples := sem:rdf-parse ($output-rdf, "rdfxml")
 			let $sparql-result as xs:boolean := sem:sparql-triples ($sparql, $ml-triples)
 			let $result := $sparql-result = $expected-result
-			let $text-result := if ($result) then "passed" else "failed"
-			let $_ := local:count-result ($pass-fail-map, $text-result)
+			let $text-result := if ($result) then "Pass" else "Fail"
+			(: let $_ := local:count-result ($pass-fail-map, $text-result) :)
 			return
 			(
 			    <sparql-result>{ $sparql-result }</sparql-result>,
@@ -129,8 +130,9 @@ declare function local:run-tests (
 			)
 		    } catch ($e) {
 		    	(
+		    		(: local:count-result ($pass-fail-map, "Error"), :)
 				<sparql-result>false - exception</sparql-result>,
-				<test-result>error</test-result>,
+				<test-result>Error</test-result>,
 				<test-error>{ $e }</test-error>
 		    	)
 		    }
@@ -139,6 +141,55 @@ declare function local:run-tests (
         </test>
 };
 
-xdmp:xslt-invoke('/output-xml-to-html.xsl', <output>{ local:run-tests ($q, $pass-fail-map) }</output>)
+declare function local:inject-counts (
+	$tests as element(test)*
+) as xs:string
+{
+	xdmp:to-json (
+		json:array (
+			<json:array>{
+				for $r in ("Pass", "Fail", "Error")
+				return
+				<json:array>
+					<json:value xsi:type="xs:string">{ $r }</json:value>
+					<json:value xsi:type="xs:integer">{ fn:count ($tests//test-result[. = $r]) }</json:value>
+				</json:array>
+			}</json:array>
+		)
+	)
+};
 
-(: <output>{ local:run-tests ($q, $pass-fail-map) }</output> :)
+declare function local:render-tests (
+	$tests as element(test)*
+) as element()
+{
+	<html xmlns="http://www.w3.org/1999/xhtml">
+	    <head>
+		<title>OverStroy RDFa Test Suite Result</title>
+		<link rel="stylesheet" type="text/css" href="/css/std.css"/>
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+		<script src="http://code.highcharts.com/highcharts.js"></script>
+		<script src="/js/test-result-chart.js"></script>
+	    </head>
+	    <body style="height: 95%;">
+		<img src="/images/logo-overstory-co-uk-white-bg-x200.png" style="float: right; padding: 10px;" width="150" height="114"/>
+		<div style="padding-top: 4.0em;">
+		    <h1>RDFa Test Results</h1>
+		</div>
+		<p>
+		    <div id="graph-container" style="width:80%; height:0px;"></div>
+		</p>
+
+		<script>
+			$(function(){{
+                                var chart = $('#graph-container').highcharts();
+                                chart.series[0].setData ({ local:inject-counts ($tests) });
+			}});
+		</script>
+
+	    </body>
+	</html>
+};
+
+local:render-tests (local:run-tests ($q))
+
