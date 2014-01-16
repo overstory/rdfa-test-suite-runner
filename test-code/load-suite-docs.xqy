@@ -86,7 +86,7 @@ declare function local:load-manifest(
 (: run sparql on the loaded manifest :)
 <output>
 {
-for $result in sem:sparql ($q) [5]
+for $result in sem:sparql ($q)
 let $xml-uri := fn:string (map:get ($result, "data"))
 let $xml-doc-uri := fn:substring-after ($xml-uri, $rdfa-info-url-root)
 let $xml := local:get-data ($xml-uri)
@@ -96,20 +96,25 @@ let $sparql := xdmp:document-get ($sparql-uri, $text-options)/text()
 let $current-test-number := fn:substring-before(fn:substring-after($xml-uri, $rdfa-info-url-full), '.xml')
 let $expected-result := fn:string(map:get ($result, "expected"))
 
+let $test-sparql :=
+
+'ASK WHERE { <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/12/cal/icaltzd#Vevent> . <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/2002/12/cal/icaltzd#summary> "Weekend off in Iona" . <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/2002/12/cal/icaltzd#dtstart> "2006-10-21"^^<http://www.w3.org/2001/XMLSchema#date> . <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/2002/12/cal/icaltzd#dtend> "2006-10-23"^^<http://www.w3.org/2001/XMLSchema#date> . <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/2002/12/cal/icaltzd#url> <http://freetime.example.org/> . <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/2002/12/cal/icaltzd#location> "Iona, UK" . }'
+
+
 return (
     <test-number>{$current-test-number}</test-number>,
     <expected>{$expected-result}</expected>,
     <result>
     {
     try {
-    let $output-rdf := rdfa:parse_rdfa($xml, "_")
+    let $output-rdf := rdfa:parse_rdfa($xml, $xml-uri)
     let $ml-triples := sem:rdf-parse($output-rdf, "rdfxml")
     return
     (
-        <sparql>{$sparql}</sparql>,
+        (:<sparql>{$sparql}</sparql>,
         <input-xml>{$xml}</input-xml>,
         <rdf>{$output-rdf}</rdf>,
-        <triples>{$ml-triples}</triples>,
+        <triples>{$ml-triples}</triples>,:)
         <got>
         {
         sem:sparql-triples($sparql, $ml-triples)
