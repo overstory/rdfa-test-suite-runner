@@ -13,7 +13,7 @@ PREFIX mf: <http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#>
 PREFIX qt: <http://www.w3.org/2001/sw/DataAccess/tests/test-query#>
 PREFIX test: <http://www.w3.org/2006/03/test-description#>
 
-SELECT ?name ?comment ?specref ?query ?data ?expected
+SELECT DISTINCT ?name ?comment ?specref ?query ?data ?expected
   WHERE
   {
     ?test a mf:QueryEvaluationTest.
@@ -86,7 +86,7 @@ declare function local:load-manifest(
 (: run sparql on the loaded manifest :)
 <output>
 {
-for $result in sem:sparql ($q)
+for $result in sem:sparql ($q) [10]
 let $xml-uri := fn:string (map:get ($result, "data"))
 let $xml-doc-uri := fn:substring-after ($xml-uri, $rdfa-info-url-root)
 let $xml := local:get-data ($xml-uri)
@@ -96,12 +96,10 @@ let $sparql := xdmp:document-get ($sparql-uri, $text-options)/text()
 let $current-test-number := fn:substring-before(fn:substring-after($xml-uri, $rdfa-info-url-full), '.xml')
 let $expected-result := fn:string(map:get ($result, "expected"))
 
-(: remove when done :)
-let $counter := 0
 
 return (
 <entry>
-    <counter>{$counter+1}</counter>
+   
     <test-number>{$current-test-number}</test-number>
     <expected>{$expected-result}</expected>
     <result>
@@ -113,10 +111,10 @@ return (
         return
         (
             (: REMOVE DEBUG WHEN DONE :)
-            (:<sparql>{$sparql}</sparql>,
+            <sparql>{$sparql}</sparql>,
             <input-xml>{$xml}</input-xml>,
             <rdf>{$output-rdf}</rdf>,
-            <triples>{$ml-triples}</triples>,:)
+            <triples>{$ml-triples}</triples>,
             <sparql-result>
             {
                 $sparql-result
@@ -135,13 +133,14 @@ return (
         )
     } catch($e)
     {
-        <sparql-result>{"false"}</sparql-result>,
+        <sparql-result>{"false - exception"}</sparql-result>,
         <test-result>{
             if (xs:boolean($expected-result)=fn:false()) 
                 then ( "PASSED" )
                 else(
                 (: REMOVE WHEN DONE :)
-                $e
+                (:$e:)
+                "FAILED", $e
                 )
             }
         </test-result>
