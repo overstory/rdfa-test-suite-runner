@@ -96,11 +96,6 @@ let $sparql := xdmp:document-get ($sparql-uri, $text-options)/text()
 let $current-test-number := fn:substring-before(fn:substring-after($xml-uri, $rdfa-info-url-full), '.xml')
 let $expected-result := fn:string(map:get ($result, "expected"))
 
-let $test-sparql :=
-
-'ASK WHERE { <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/12/cal/icaltzd#Vevent> . <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/2002/12/cal/icaltzd#summary> "Weekend off in Iona" . <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/2002/12/cal/icaltzd#dtstart> "2006-10-21"^^<http://www.w3.org/2001/XMLSchema#date> . <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/2002/12/cal/icaltzd#dtend> "2006-10-23"^^<http://www.w3.org/2001/XMLSchema#date> . <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/2002/12/cal/icaltzd#url> <http://freetime.example.org/> . <http://rdfa.info/test-suite/test-cases/rdfa1.1/xml/0207.xml#event1> <http://www.w3.org/2002/12/cal/icaltzd#location> "Iona, UK" . }'
-
-
 return (
     <test-number>{$current-test-number}</test-number>,
     <expected>{$expected-result}</expected>,
