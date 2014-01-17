@@ -1,6 +1,7 @@
 xquery version '1.0-ml';
 
 declare namespace json="http://marklogic.com/xdmp/json";
+declare namespace xhtml="http://www.w3.org/1999/xhtml";
 
 import module namespace sem = "http://marklogic.com/semantics" at "/MarkLogic/semantics.xqy";
 
@@ -53,8 +54,6 @@ declare variable $DATA-MESH-URI-SPACE-ROOT := "http://data.overstory.co.uk/resou
 
 declare variable $output-to-html-xslt := xdmp:document-get("/output-xml-to-html.xsl");
 
-(: declare variable $pass-fail-map := map:map(); :)
-
 
 declare function local:load-doc-from-uri (
 	$uri as xs:string,
@@ -100,6 +99,8 @@ declare function local:run-tests (
 ) as element(test)*
 {
 	for $result in sem:sparql ($sparql)
+	let $name := fn:string (map:get ($result, "name"))
+	let $comment := fn:string (map:get ($result, "comment"))
         let $xml-uri := fn:string (map:get ($result, "data"))
         let $xml := local:get-doc ($xml-uri)
         let $sparql-uri := fn:string (map:get ($result, "query"))
@@ -109,30 +110,43 @@ declare function local:run-tests (
 
         return
         <test>
-            <xml>{ $xml }</xml>
+            <name>{ $name }</name>
+            <comment>{ $comment }</comment>
+            <input-xml>{ $xml }</input-xml>
             <sparql>{ $sparql }</sparql>
             <test-xml-uri>{ $xml-uri }</test-xml-uri>
             <test-number>{ $test-id }</test-number>
-            <expected>{$expected-result}</expected>
+            <expected>{ $expected-result }</expected>
             <result>
             {
 		    try {
 			let $output-rdf := rdfa:parse_rdfa ($xml, $xml-uri)
-			let $ml-triples := sem:rdf-parse ($output-rdf, "rdfxml")
+			(: sem:rdf-parse complains if you give it an empty RDF/XML document (which is legit for many tests) :)
+			let $ml-triples := if (fn:exists ($output-rdf/*)) then sem:rdf-parse ($output-rdf, "rdfxml") else ()
 			let $sparql-result as xs:boolean := sem:sparql-triples ($sparql, $ml-triples)
 			let $result := $sparql-result = $expected-result
 			let $text-result := if ($result) then "Pass" else "Fail"
-			(: let $_ := local:count-result ($pass-fail-map, $text-result) :)
 			return
 			(
-			    <sparql-result>{ $sparql-result }</sparql-result>,
-			    <test-result>{ $text-result }</test-result>
+			    <actual-result>{ $sparql-result }</actual-result>,
+			    <test-result>{ $text-result }</test-result>,
+			    <output-rdf-xml>{ $output-rdf }</output-rdf-xml>,
+			    <output-sem-triples>{ $ml-triples }</output-sem-triples>
 			)
 		    } catch ($e) {
+		        let $output-rdf :=
+		        	try {
+		        		(: In case the problem is with sem:rdf-parse() :)
+		        		rdfa:parse_rdfa ($xml, $xml-uri)
+		        	} catch ($e) {
+		        		()
+		        	}
+
+		        return
 		    	(
-		    		(: local:count-result ($pass-fail-map, "Error"), :)
-				<sparql-result>false - exception</sparql-result>,
+				<actual-result>exception</actual-result>,
 				<test-result>Error</test-result>,
+			        if (fn:exists ($output-rdf)) then <output-rdf-xml>{ $output-rdf }</output-rdf-xml> else (),
 				<test-error>{ $e }</test-error>
 		    	)
 		    }
@@ -159,35 +173,72 @@ declare function local:inject-counts (
 	)
 };
 
+declare function local:format-test-result (
+	$test as element(test)
+) as element(xhtml:div)
+{
+	let $name := $test/name
+	let $comment := $test/comment
+	let $test-number := $test/test-number
+	let $test-result := $test/result/test-result
+	let $expected := $test/expected
+	let $actual-result := $test/result/actual-result
+	let $input-xml := $test/input-xml/node()
+	let $output-rdf-xml := ($test/result/output-rdf-xml/node(), <no-rdf-xml-output/>)[1]
+	let $output-sem-triples := ($test/result/output-sem-triples, $test/result/test-error)[1]
+	let $error-msg := $test/result/test-error/error:error/error:format-string/fn:string()
+	let $quote-options := <options xmlns="xdmp:quote"><indent>yes</indent><indent-untyped>yes</indent-untyped></options>
+
+	return
+	<div class="test-detail" xmlns="http://www.w3.org/1999/xhtml">
+		<h3 class="{ $test-result }">{ $name } ({ $comment })</h3>
+		<p class="test-result">{ $test-number } Expected: { $expected }, Actual: { $actual-result } &nbsp; { if (fn:exists ($error-msg)) then <span class="error-msg">{ $error-msg }</span> else () }</p>
+		<div class="xml-output"><p><pre class="brush: xml">{ xdmp:quote ($input-xml, $quote-options) }</pre></p></div>
+		<div class="xml-output"><p ><pre class="brush: xml">{ xdmp:quote ($output-rdf-xml, $quote-options) }</pre></p></div>
+		{ if (fn:exists ($output-sem-triples)) then <div class="xml-output"><p><pre class="brush: xml">{ xdmp:quote ($output-sem-triples, $quote-options) }</pre></p></div> else () }
+	</div>
+};
+
 declare function local:render-tests (
 	$tests as element(test)*
 ) as element()
 {
 	<html xmlns="http://www.w3.org/1999/xhtml">
-	    <head>
-		<title>OverStroy RDFa Test Suite Result</title>
-		<link rel="stylesheet" type="text/css" href="/css/std.css"/>
-		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
-		<script src="http://code.highcharts.com/highcharts.js"></script>
-		<script src="/js/test-result-chart.js"></script>
-	    </head>
-	    <body style="height: 95%;">
-		<img src="/images/logo-overstory-co-uk-white-bg-x200.png" style="float: right; padding: 10px;" width="150" height="114"/>
-		<div style="padding-top: 4.0em;">
-		    <h1>RDFa Test Results</h1>
-		</div>
-		<p>
-		    <div id="graph-container" style="width:80%; height:0px;"></div>
-		</p>
+		<head>
+			<title>OverStroy RDFa Test Suite Result</title>
+			<link href="/css/shCore.css" rel="stylesheet" type="text/css"/>
+			<link href="/css/shThemeDefault.css" rel="stylesheet" type="text/css"/>
+			<link rel="stylesheet" type="text/css" href="/css/std.css"/>
+			<link rel="stylesheet" type="text/css" href="/css/tests.css"/>
+			<script type="text/javascript" src="/js/shCore.js"></script>
+			<script type="text/javascript" src="/js/shBrushXml.js"></script>
+			<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+			<script type="text/javascript" src="http://code.highcharts.com/highcharts.js"></script>
+			<script type="text/javascript" src="/js/test-result-chart.js"></script>
+		</head>
+		<body style="height: 95%;">
+			<img src="/images/logo-overstory-co-uk-white-bg-x200.png" style="float: right; padding: 10px;" width="150" height="114"/>
+			<div style="padding-top: 4.0em;">
+				<h1>RDFa Test Results</h1>
+			</div>
 
+			<div id="graph-container"></div>
+
+			<div class="test-results">{
+				for $test in $tests (: [result/test-result ne "Pass"] :)
+				order by $test/*:result/*:test-result, $test/*:test-number
+				return local:format-test-result ($test)
+			}</div>
+		</body>
 		<script>
 			$(function(){{
-                                var chart = $('#graph-container').highcharts();
-                                chart.series[0].setData ({ local:inject-counts ($tests) });
+				var chart = $('#graph-container').highcharts();
+				chart.series[0].setData ({ local:inject-counts ($tests) });
 			}});
 		</script>
-
-	    </body>
+		<script type="text/javascript">
+		     SyntaxHighlighter.all()
+		</script>
 	</html>
 };
 
