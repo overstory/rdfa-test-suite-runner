@@ -52,8 +52,6 @@ declare variable $rdfa-info-url-full := 'http://rdfa.info/test-suite/test-cases/
 
 declare variable $DATA-MESH-URI-SPACE-ROOT := "http://data.overstory.co.uk/resources/";
 
-declare variable $output-to-html-xslt := xdmp:document-get("/output-xml-to-html.xsl");
-
 
 declare function local:load-doc-from-uri (
 	$uri as xs:string,
