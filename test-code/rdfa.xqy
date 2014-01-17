@@ -108,7 +108,7 @@ declare function ml:parse_rdfa (
 	<rdf:RDF>{
 		ml:namespaces-from-prefix-map ($prefixes-map),
 		$doc/namespace::*,
-
+	    
 	    let $base := if ($doc//html:head/html:base/@href)
 			 then $doc//html:head/html:base/@href
 			 else if ($url)
@@ -196,14 +196,17 @@ declare function ml:subject($node as node(), $base as xs:string) {
 declare function ml:subject-ancestor($node as node(), $base as xs:string) {
     if ($node/@resource)
     then ml:safe-resolve-uri-or-curie($node/@resource, $node, $base)
-    else if ($node/@href)
-         then ml:safe-resolve-uri($node/@href, $base)
+    
+    (: RDFa 1.1, @href should not be a subject :)
+    (:else if ($node/@href)
+         then ml:safe-resolve-uri($node/@href, $base) :)
          else if ($node/(@rel | @rev))
               then ml:generate-bnode-id($node)
               else if ($node/@about)
                   then ml:safe-resolve-uri-or-curie($node/@about, $node, $base)
-                  else if ($node/@src)
-                       then ml:safe-resolve-uri($node/@src, $base)
+                  (: RDFa 1.1, @src should not be a subject :)
+                  (:else if ($node/@src)
+                       then ml:safe-resolve-uri($node/@src, $base):)
                         else if ($node/@typeof)
                              then ml:generate-bnode-id($node, "typeof")
                              else if ($node/..)
