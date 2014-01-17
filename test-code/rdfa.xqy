@@ -108,7 +108,6 @@ declare function ml:parse_rdfa (
 	<rdf:RDF>{
 		ml:namespaces-from-prefix-map ($prefixes-map),
 		$doc/namespace::*,
-	    
 	    let $base := if ($doc//html:head/html:base/@href)
 			 then $doc//html:head/html:base/@href
 			 else if ($url)
