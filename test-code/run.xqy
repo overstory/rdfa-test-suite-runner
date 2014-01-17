@@ -183,6 +183,7 @@ declare function local:format-test-result (
 	let $actual-result := $test/result/actual-result
 	let $input-xml := $test/input-xml/node()
 	let $output-rdf-xml := ($test/result/output-rdf-xml/node(), <no-rdf-xml-output/>)[1]
+	let $sparql := $test/sparql/node()
 	let $output-sem-triples := ($test/result/output-sem-triples, $test/result/test-error)[1]
 	let $error-msg := $test/result/test-error/error:error/error:format-string/fn:string()
 	let $quote-options := <options xmlns="xdmp:quote"><indent>yes</indent><indent-untyped>yes</indent-untyped></options>
@@ -193,6 +194,7 @@ declare function local:format-test-result (
 		<p class="test-result">{ $test-number } Expected: { $expected }, Actual: { $actual-result } &nbsp; { if (fn:exists ($error-msg)) then <span class="error-msg">{ $error-msg }</span> else () }</p>
 		<div class="xml-output"><p><pre class="brush: xml">{ xdmp:quote ($input-xml, $quote-options) }</pre></p></div>
 		<div class="xml-output"><p ><pre class="brush: xml">{ xdmp:quote ($output-rdf-xml, $quote-options) }</pre></p></div>
+		<div class="xml-output"><p ><pre>{ $sparql }</pre></p></div>
 		{ if (fn:exists ($output-sem-triples)) then <div class="xml-output"><p><pre class="brush: xml">{ xdmp:quote ($output-sem-triples, $quote-options) }</pre></p></div> else () }
 	</div>
 };
@@ -210,6 +212,7 @@ declare function local:render-tests (
 			<link rel="stylesheet" type="text/css" href="/css/tests.css"/>
 			<script type="text/javascript" src="/js/shCore.js"></script>
 			<script type="text/javascript" src="/js/shBrushXml.js"></script>
+			<script type="text/javascript" src="/js/shBrushPlain.js"></script>
 			<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
 			<script type="text/javascript" src="http://code.highcharts.com/highcharts.js"></script>
 			<script type="text/javascript" src="/js/test-result-chart.js"></script>
@@ -223,7 +226,7 @@ declare function local:render-tests (
 			<div id="graph-container"></div>
 
 			<div class="test-results">{
-				for $test in $tests (: [result/test-result ne "Pass"] :)
+				for $test in $tests(: [result/test-result ne "Pass"] :)
 				order by $test/*:result/*:test-result, $test/*:test-number
 				return local:format-test-result ($test)
 			}</div>
