@@ -25,7 +25,7 @@ declare namespace html = "http://www.w3.org/1999/xhtml";
 declare namespace rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
 declare variable $dfvocab := "http://www.w3.org/1999/xhtml/vocab#";
-declare variable $default-base := $dfvocab;
+declare variable $default-base := ("http://BASE.URI");
 declare variable $htmlrels := ( "alternate",
                                 "appendix",
                                 "bookmark",
@@ -96,8 +96,8 @@ declare variable $prefixes-map := map:map(
 (: we don't have a guarantee that base-uri will be set in non-database docs
 , so we have to explicitly pass it in :)
 declare function ml:parse_rdfa (
-	$doc as node(),
-	$url as xs:string?
+        $doc as node(),
+        $url as xs:string
 ) as element(rdf:RDF)
 {
                 (: ToDo: change calls to namespace-uri-for-prefix to a local funciton that will look in the map
@@ -117,7 +117,7 @@ declare function ml:parse_rdfa (
                                  else $default-base
             for $node in $doc/descendant-or-self::*
             return (
-
+            
                 if ($node/@property)
                 then ml:property($node, string(normalize-space($node/@property)), $base)
                 else (),
@@ -181,13 +181,12 @@ declare function ml:subject($node as node(), $base as xs:string) {
          then ml:safe-resolve-uri($node/@src, $base)
          else if (local-name($node) = ("head", "body"))
               then $base
-              (:else if ($node/@resource)
-              then ml:safe-resolve-uri($node/@resource,$base):)
-               (: Marcin change
+              
+               (: Marcin change 
                else if ($node/@typeof)
                then ml:generate-bnode-id($node, "typeof")
                else ml:subject-ancestor($node/.., $base)
-
+               
                if element has @typeof and does not contain @about then it's a blank node
                :)
               else if ($node/@typeof and $node/@about)
@@ -199,7 +198,7 @@ declare function ml:subject($node as node(), $base as xs:string) {
 declare function ml:subject-ancestor($node as node(), $base as xs:string) {
     if ($node/@resource)
     then ml:safe-resolve-uri-or-curie($node/@resource, $node, $base)
-
+    
     (: RDFa 1.1, @href should not be a subject :)
     (:else if ($node/@href)
          then ml:safe-resolve-uri($node/@href, $base) :)
@@ -221,13 +220,13 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
     for $prop in if (normalize-space($val) eq "") then () else tokenize($val, "\s+")
     let $prefix := substring-before($prop, ":")
     let $nsuri := ml:namespace-uri-for-prefix($prefix, $node)
-    (:
+    (: 
     Marcin: the second bit is incorrect, a node can have nested XML elements and not be a XMLLiteral
     let $isXML := ($node/@datatype and ml:expand-curie($node/@datatype, $node) eq "http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral" or
                   (not($node/@datatype) and $node/node() and $node/(node() except text()) ))
     :)
     let $isXML := ($node/@datatype and ml:expand-curie($node/@datatype, $node) eq "http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral")
-
+    
     let $effective-dt := if ($node/@datatype and $node/@datatype ne "")
                          then
                              if ($isXML)
@@ -237,21 +236,21 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
     let $lang := ($node/ancestor-or-self::*/@xml:lang)[position() eq last()]
     let $subj := ml:subject($node, $base)
     let $bnode-ref := ml:generate-bnode-id($node, "typeof")
-
+    
     let $locobj := if ($node/@resource)
                    then ml:safe-resolve-uri-or-curie($node/@resource, $node, $base)
                    else  ml:safe-resolve-uri($node/@href, $base)
 
+    let $locsbj := ml:subject($node, $base)
 
     where 1
     return
         if ($subj)
         then
-
+           ( 
             <rdf:Description>
             {
-
-                (:
+                (: 
                 Marcin: if bnode then nodeID should be used for local referencing
                 :)
                 if (starts-with($subj, "_"))
@@ -261,35 +260,43 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
                 element { ml:curie-to-qname($prop, $node) }
                 {
 
-
+                    
                     (: attribute ns { $prefix }, :)
                     if ($effective-dt)
                     then attribute rdf:datatype {$effective-dt}
                     else (),
 
                     $lang,
+                    
+                    
+                    
+                   (: "testsubj: ", $subj,
+                    "test effective-dt: ", $effective-dt,
+                    "test isXML: ", $isXML,
+                    "test prop: ", $prop,:)
+                    
 
 
                     (: proper XML Literal?? :)
                     if ($isXML)
                     then (attribute rdf:parseType { "Literal" } , for $n in $node/node() return ml:deep-copy($n) )
                         else if ($node/@typeof and not($node/@about))
-                        then
-                        (
+                        then 
+                        ( 
                             attribute rdf:nodeID {string($bnode-ref)}
                         )
-                        else if ($locobj)
-                        then
-                        (
-                            attribute rdf:resource { $locobj }
+                        else if ($locobj and not($node/@rel) and not($node/@rev))
+                        then 
+                        ( 
+                             attribute rdf:resource { $locobj }
                         )
-
                         else string(if ($node/@content) then $node/@content else $node)
 
                 }
-
+                
             }
             </rdf:Description>
+            )
         else ()
 };
 
@@ -327,9 +334,7 @@ declare function ml:relrev-immed($node as node(), $val as xs:string, $relorrev, 
                     then attribute rdf:nodeID { $effective-obj }
                     else attribute rdf:resource { $effective-obj }
                 }
-
             }
-
             </rdf:Description>
         else ()
 };
@@ -485,50 +490,21 @@ declare function ml:expand-curie($curie as xs:string, $context as element()) as 
 };
 
 (: RDF serialization requires a qname, which might not match exactly with a CURIE :)
-declare function ml:curie-to-qname (
-	$curie as xs:string,
-	$context as element()
-) as xs:QName?
-{
-	(: Re-wrote this function, but it's still not completly correct I think. Rh :)
-	let $prefix := fn:substring-before ($curie, ":")
-	let $e :=
-		if (ml:namespace-uri-for-prefix ($prefix, $context))
-		then fn:substring-after ($curie, ":")
-		else
-			if (fn:starts-with ($curie, ":"))
-			then fn:substring ($curie, 2)
-			else $curie
-	let $elem-part := (if ($e) then $e else (), fn:string ($context))[1]
-	let $expanded := ml:expand-curie ($curie, $context)
-	let $ns-part := if ($e) then fn:substring-before ($expanded, $e) else $expanded
-
-(:
+declare function ml:curie-to-qname($curie as xs:string, $context as element()) as xs:QName? {
     let $expanded := ml:expand-curie($curie, $context)
-    let $elt := replace ($expanded , '^.*[#|/]','')
-    let $elem-part := (if ($elt) then $elt else (), fn:string ($context))[1]
+    let $elem-part := replace ($expanded , '^.*[#|/]','')
     let $ns-part := replace($expanded, concat('^(.*)', $elem-part,'.*'),'$1')
- :)
-(: let $_ := if ($elt and (fn:not (fn:starts-with ($curie, "_:")))) then () else xdmp:log ("curie: " || $curie || ", expanded: " || $expanded || ", elem-part: " || $elem-part || ", ns-part: " || $ns-part) :)
     return fn:QName($ns-part, $elem-part)
 };
 
 (: there is some spec ambiguity on how fn:resolve-uri() should behave with a
 zero-length input. We sidestep it by handling it explicitly here :)
-declare function ml:safe-resolve-uri (
-	$rel as xs:string,
-	$base as xs:string
-) as xs:string
-{
-	if ($rel eq "")
-	then $base
-	else
-		if (($rel = ":") or ($rel = "[:]"))
-		then $dfvocab
-		else
-			if (starts-with($rel, "#"))
-			then concat($base, $rel)
-			else resolve-uri($rel, $base)
+declare function ml:safe-resolve-uri($rel as xs:string, $base as xs:string) as xs:string {
+    if ($rel eq "")
+    then $base
+    else if (starts-with($rel, "#"))
+         then concat($base, $rel)
+         else resolve-uri($rel, $base)
 };
 
 declare function ml:safe-resolve-uri-or-curie($val as xs:string, $context as element(), $base as xs:string) as xs:string? {
