@@ -30,6 +30,8 @@ SELECT DISTINCT ?test ?name ?comment ?query ?data ?expected
   ORDER BY ASC(?test)
 ';
 
+declare variable $hide-good-tests := xdmp:get-request-field ("hide-good", "false") cast as xs:boolean;
+
 declare variable $xml-options :=
 	<options xmlns="xdmp:document-get">
            <format>xml</format>
@@ -225,8 +227,17 @@ declare function local:render-tests (
 
 			<div id="graph-container"></div>
 
+			<div class="run-box">
+				<p>
+					<a href="?hide-good=true">Run and list only Error/Fail results</a>
+				</p>
+				<p>
+					<a href="?hide-good=false">Run and list all test results</a>
+				</p>
+			</div>
+
 			<div class="test-results">{
-				for $test in $tests(: [result/test-result ne "Pass"] :)
+				for $test in $tests[fn:not ($hide-good-tests) or (*:result/*:test-result ne "Pass")]
 				order by $test/*:result/*:test-result, $test/*:test-number
 				return local:format-test-result ($test)
 			}</div>

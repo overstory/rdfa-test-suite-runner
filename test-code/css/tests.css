@@ -18,6 +18,12 @@
     font-weight: bold;
 }
 
+.run-box {
+    margin-bottom: 8px;
+    padding-left: 5px;
+    border: solid #66aaaa medium;
+}
+
 .test-detail {
     margin: 3px;
     border: solid #66aaaa medium;
