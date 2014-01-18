@@ -76,7 +76,7 @@ declare variable $prefixes-map := map:map(
     <map:entry key="ctag"><map:value xsi:type="xs:string">http://commontag.org/ns#</map:value></map:entry>
     <map:entry key="dc"><map:value xsi:type="xs:string">http://purl.org/dc/terms/</map:value></map:entry>
     <map:entry key="dcterms"><map:value xsi:type="xs:string">http://purl.org/dc/terms/</map:value></map:entry>
-    <map:entry key="dc11"><map:value xsi:type="xs:string">http://purl.org/dc/elements/1.1/</map:value></map:entry>
+    <!--<map:entry key="dc11"><map:value xsi:type="xs:string">http://purl.org/dc/elements/1.1/</map:value></map:entry>-->
     <map:entry key="foaf"><map:value xsi:type="xs:string">http://xmlns.com/foaf/0.1/</map:value></map:entry>
     <map:entry key="gr"><map:value xsi:type="xs:string">http://purl.org/goodrelations/v1#</map:value></map:entry>
     <map:entry key="ical"><map:value xsi:type="xs:string">http://www.w3.org/2002/12/cal/icaltzd#</map:value></map:entry>
@@ -96,79 +96,81 @@ declare variable $prefixes-map := map:map(
 (: we don't have a guarantee that base-uri will be set in non-database docs
 , so we have to explicitly pass it in :)
 declare function ml:parse_rdfa (
-	$doc as node(),
-	$url as xs:string
+        $doc as node(),
+        $url as xs:string
 ) as element(rdf:RDF)
 {
-		(: ToDo: change calls to namespace-uri-for-prefix to a local funciton that will look in the map
-		:)
+                (: ToDo: change calls to namespace-uri-for-prefix to a local funciton that will look in the map
+                :)
 
-	ml:load-namespace-map-from-prefixes ($doc/@prefix/fn:string()),
+        ml:load-namespace-map-from-prefixes ($doc/@prefix/fn:string()),
 
-	<rdf:RDF>{
-		ml:namespaces-from-prefix-map ($prefixes-map),
-		$doc/namespace::*,
-	    let $base := if ($doc//html:head/html:base/@href)
-			 then $doc//html:head/html:base/@href
-			 else if ($url)
-			      then $url
-			      else $default-base
-	    for $node in $doc//*
-	    return (
+        <rdf:RDF>{
+                ml:namespaces-from-prefix-map ($prefixes-map),
+                $doc/namespace::*,
+            let $base := if ($doc//html:head/html:base/@href)
+                         then $doc//html:head/html:base/@href
+                         else if ($doc/self::*/@xml:base)
+                            then($doc/self::*/@xml:base)
+                            else if ($url)
+                                 then $url
+                                 else $default-base
+            for $node in $doc/descendant-or-self::*
+            return (
+            
+                if ($node/@property)
+                then ml:property($node, string(normalize-space($node/@property)), $base)
+                else (),
 
-		if ($node/@property)
-		then ml:property($node, string($node/@property), $base)
-		else (),
+                if ($node/@rel)
+                then ml:relrev($node, string(normalize-space($node/@rel)), "rel", $base)
+                else (),
 
-		if ($node/@rel)
-		then ml:relrev($node, string($node/@rel), "rel", $base)
-		else (),
+                if ($node/@rev)
+                then ml:relrev($node, string(normalize-space($node/@rev)), "rev", $base)
+                else (),
 
-		if ($node/@rev)
-		then ml:relrev($node, string($node/@rev), "rev", $base)
-		else (),
+                if ($node/@typeof)
+                then ml:typeof($node, string(normalize-space($node/@typeof)), $base)
+                else ()
 
-		if ($node/@typeof)
-		then ml:typeof($node, string($node/@typeof), $base)
-		else ()
-
-	    )
-	}</rdf:RDF>
+            )
+        }</rdf:RDF>
 };
 
 declare function ml:load-namespace-map-from-prefixes (
-	$prefixes-str as xs:string
+        $prefixes-str as xs:string
 ) as empty-sequence()
 {
-	let $tokens := tokenize ($prefixes-str, "\s+")
-	let $_ :=
-		for $token at $idx in $tokens
-		return
-		if (($idx mod 2) = 1)
-		then (
-			map:put ($prefixes-map, fn:substring-before ($token, ":"), $tokens[$idx + 1])
-		) else ()
-	return ()
+        let $tokens := tokenize ($prefixes-str, "\s+")
+        let $_ :=
+                for $token at $idx in $tokens
+                return
+                if (($idx mod 2) = 1)
+                then (
+                        map:put ($prefixes-map, fn:substring-before ($token, ":"), $tokens[$idx + 1])
+                ) else ()
+        return ()
 };
 
 declare function ml:namespaces-from-prefix-map (
-	$prefix-map as map:map
+        $prefix-map as map:map
 ) as node()*
 {
-	for $prefix in map:keys ($prefix-map)
-	return namespace { $prefix } { map:get ($prefix-map, $prefix) }
+        for $prefix in map:keys ($prefix-map)
+        return namespace { $prefix } { map:get ($prefix-map, $prefix) }
 };
 
 declare function ml:namespace-uri-for-prefix (
-	$prefix as xs:string,
-	$node as node()
+        $prefix as xs:string,
+        $node as node()
 ) as xs:string?
 {
-	let $uri := map:get ($prefixes-map, $prefix)
-	return
-	if (fn:exists ($uri))
-	then $uri
-	else fn:namespace-uri-for-prefix ($prefix, $node)
+        let $uri := map:get ($prefixes-map, $prefix)
+        return
+        if (fn:exists ($uri))
+        then $uri
+        else fn:namespace-uri-for-prefix ($prefix, $node)
 };
 
 (: for triples created from this very $node, what is the subject? :)
@@ -179,11 +181,13 @@ declare function ml:subject($node as node(), $base as xs:string) {
          then ml:safe-resolve-uri($node/@src, $base)
          else if (local-name($node) = ("head", "body"))
               then $base
-               (: Marcin change
+              (:else if ($node/@resource)
+              then ml:safe-resolve-uri($node/@resource,$base):)
+               (: Marcin change 
                else if ($node/@typeof)
                then ml:generate-bnode-id($node, "typeof")
                else ml:subject-ancestor($node/.., $base)
-
+               
                if element has @typeof and does not contain @about then it's a blank node
                :)
               else if ($node/@typeof and $node/@about)
@@ -195,7 +199,7 @@ declare function ml:subject($node as node(), $base as xs:string) {
 declare function ml:subject-ancestor($node as node(), $base as xs:string) {
     if ($node/@resource)
     then ml:safe-resolve-uri-or-curie($node/@resource, $node, $base)
-
+    
     (: RDFa 1.1, @href should not be a subject :)
     (:else if ($node/@href)
          then ml:safe-resolve-uri($node/@href, $base) :)
@@ -217,13 +221,13 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
     for $prop in if (normalize-space($val) eq "") then () else tokenize($val, "\s+")
     let $prefix := substring-before($prop, ":")
     let $nsuri := ml:namespace-uri-for-prefix($prefix, $node)
-    (:
+    (: 
     Marcin: the second bit is incorrect, a node can have nested XML elements and not be a XMLLiteral
     let $isXML := ($node/@datatype and ml:expand-curie($node/@datatype, $node) eq "http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral" or
                   (not($node/@datatype) and $node/node() and $node/(node() except text()) ))
     :)
     let $isXML := ($node/@datatype and ml:expand-curie($node/@datatype, $node) eq "http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral")
-
+    
     let $effective-dt := if ($node/@datatype and $node/@datatype ne "")
                          then
                              if ($isXML)
@@ -233,15 +237,21 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
     let $lang := ($node/ancestor-or-self::*/@xml:lang)[position() eq last()]
     let $subj := ml:subject($node, $base)
     let $bnode-ref := ml:generate-bnode-id($node, "typeof")
+    
+    let $locobj := if ($node/@resource)
+                   then ml:safe-resolve-uri-or-curie($node/@resource, $node, $base)
+                   else  ml:safe-resolve-uri($node/@href, $base)
+                   
 
     where 1
     return
         if ($subj)
         then
-
+            
             <rdf:Description>
             {
-                (:
+                
+                (: 
                 Marcin: if bnode then nodeID should be used for local referencing
                 :)
                 if (starts-with($subj, "_"))
@@ -251,34 +261,33 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
                 element { ml:curie-to-qname($prop, $node) }
                 {
 
-
+                    
                     (: attribute ns { $prefix }, :)
                     if ($effective-dt)
                     then attribute rdf:datatype {$effective-dt}
                     else (),
 
                     $lang,
-
-
-                    (:"testsubj: ", $subj,
-                    "test effective-dt: ", $effective-dt,
-                    "test isXML: ", $isXML,
-                    "test prop: ", $prop,:)
-
-
+                    
 
                     (: proper XML Literal?? :)
                     if ($isXML)
                     then (attribute rdf:parseType { "Literal" } , for $n in $node/node() return ml:deep-copy($n) )
                         else if ($node/@typeof and not($node/@about))
-                        then
-                        (
+                        then 
+                        ( 
                             attribute rdf:nodeID {string($bnode-ref)}
                         )
-
+                        else if ($locobj)
+                        then 
+                        (
+                            attribute rdf:resource { $locobj }
+                        )
+                        
                         else string(if ($node/@content) then $node/@content else $node)
 
                 }
+            
             }
             </rdf:Description>
         else ()
@@ -318,7 +327,9 @@ declare function ml:relrev-immed($node as node(), $val as xs:string, $relorrev, 
                     then attribute rdf:nodeID { $effective-obj }
                     else attribute rdf:resource { $effective-obj }
                 }
+                
             }
+            
             </rdf:Description>
         else ()
 };
@@ -474,31 +485,11 @@ declare function ml:expand-curie($curie as xs:string, $context as element()) as 
 };
 
 (: RDF serialization requires a qname, which might not match exactly with a CURIE :)
-declare function ml:curie-to-qname (
-	$curie as xs:string,
-	$context as element()
-) as xs:QName? {
-	(: Re-wrote this function, but it's still not completly correct I think. Rh :)
-	let $prefix := fn:substring-before ($curie, ":")
-	let $e :=
-		if (ml:namespace-uri-for-prefix ($prefix, $context))
-		then fn:substring-after ($curie, ":")
-		else
-			if (fn:starts-with ($curie, ":"))
-			then fn:substring ($curie, 2)
-			else $curie
-	let $elem-part := (if ($e) then $e else (), fn:string ($context))[1]
-	let $expanded := ml:expand-curie ($curie, $context)
-	let $ns-part := if ($e) then fn:substring-before ($expanded, $e) else $expanded
-(:
+declare function ml:curie-to-qname($curie as xs:string, $context as element()) as xs:QName? {
     let $expanded := ml:expand-curie($curie, $context)
-    let $elt := replace ($expanded , '^.*[#|/]','')
-    let $elem-part := (if ($elt) then $elt else (), fn:string ($context))[1]
+    let $elem-part := replace ($expanded , '^.*[#|/]','')
     let $ns-part := replace($expanded, concat('^(.*)', $elem-part,'.*'),'$1')
- :)
-(: let $_ := if ($elt and (fn:not (fn:starts-with ($curie, "_:")))) then () else xdmp:log ("curie: " || $curie || ", expanded: " || $expanded || ", elem-part: " || $elem-part || ", ns-part: " || $ns-part) :)
-
-	return fn:QName ($ns-part, $elem-part)
+    return fn:QName($ns-part, $elem-part)
 };
 
 (: there is some spec ambiguity on how fn:resolve-uri() should behave with a
@@ -512,14 +503,14 @@ declare function ml:safe-resolve-uri($rel as xs:string, $base as xs:string) as x
 };
 
 declare function ml:safe-resolve-uri-or-curie($val as xs:string, $context as element(), $base as xs:string) as xs:string? {
-	let $curie :=
-		if (starts-with ($val, "[") and ends-with ($val, "]"))
-        	then substring-after(substring-before($val, "]"), "[")
-        	else $val
+        let $curie :=
+                if (starts-with ($val, "[") and ends-with ($val, "]"))
+                then substring-after(substring-before($val, "]"), "[")
+                else $val
         return
-	if (ml:curie-is-valid ($curie, $context))
+        if (ml:curie-is-valid ($curie, $context))
         then ml:expand-curie ($curie, $context)
-	else ml:safe-resolve-uri($val, $base)
+        else ml:safe-resolve-uri($val, $base)
 (:
 
     if (starts-with($val, "[") and ends-with($val, "]"))
