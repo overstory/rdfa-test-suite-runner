@@ -25,7 +25,7 @@ declare namespace html = "http://www.w3.org/1999/xhtml";
 declare namespace rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
 declare variable $dfvocab := "http://www.w3.org/1999/xhtml/vocab#";
-declare variable $default-base := ("http://BASE.URI");
+declare variable $default-base := $dfvocab;
 declare variable $htmlrels := ( "alternate",
                                 "appendix",
                                 "bookmark",
@@ -97,7 +97,7 @@ declare variable $prefixes-map := map:map(
 , so we have to explicitly pass it in :)
 declare function ml:parse_rdfa (
 	$doc as node(),
-	$url as xs:string
+	$url as xs:string?
 ) as element(rdf:RDF)
 {
 		(: ToDo: change calls to namespace-uri-for-prefix to a local funciton that will look in the map
@@ -477,7 +477,8 @@ declare function ml:expand-curie($curie as xs:string, $context as element()) as 
 declare function ml:curie-to-qname (
 	$curie as xs:string,
 	$context as element()
-) as xs:QName? {
+) as xs:QName?
+{
 	(: Re-wrote this function, but it's still not completly correct I think. Rh :)
 	let $prefix := fn:substring-before ($curie, ":")
 	let $e :=
@@ -503,12 +504,20 @@ declare function ml:curie-to-qname (
 
 (: there is some spec ambiguity on how fn:resolve-uri() should behave with a
 zero-length input. We sidestep it by handling it explicitly here :)
-declare function ml:safe-resolve-uri($rel as xs:string, $base as xs:string) as xs:string {
-    if ($rel eq "")
-    then $base
-    else if (starts-with($rel, "#"))
-         then concat($base, $rel)
-         else resolve-uri($rel, $base)
+declare function ml:safe-resolve-uri (
+	$rel as xs:string,
+	$base as xs:string
+) as xs:string
+{
+	if ($rel eq "")
+	then $base
+	else
+		if (($rel = ":") or ($rel = "[:]"))
+		then $dfvocab
+		else
+			if (starts-with($rel, "#"))
+			then concat($base, $rel)
+			else resolve-uri($rel, $base)
 };
 
 declare function ml:safe-resolve-uri-or-curie($val as xs:string, $context as element(), $base as xs:string) as xs:string? {
