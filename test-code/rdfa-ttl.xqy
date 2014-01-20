@@ -167,7 +167,6 @@ declare private function emit-prefixes (
 ) as xs:string*
 {
 	(
-		let $_ := map:delete ($prefix-map, "_")
 		let $_ :=
 			for $key in map:keys ($minimal-prefixes)
 			return if (map:get ($prefix-map, $key)) then () else map:put ($prefix-map, $key, map:get ($minimal-prefixes, $key))
@@ -396,7 +395,7 @@ declare function map-from-prefixes (
         let $_ :=
                 for $token at $idx in $tokens
                 return
-                if (($idx mod 2) = 1)
+                if ((($idx mod 2) = 1) and ($token ne "_:"))
                 then map:put ($map, fn:substring-before ($token, ":"), $tokens[$idx + 1])
                 else ()
         let $_ :=
@@ -413,7 +412,8 @@ declare private function namespace-uri-for-prefix (
 ) as xs:string?
 {
         let $uri as xs:string? := map:get ($prefix-map, $prefix)
-        let $uri as xs:string? := if (fn:exists ($uri)) then $uri else fn:namespace-uri-for-prefix ($prefix, $node)
+        let $uri as xs:string? := if (fn:exists ($uri)) then $uri else map:get ($default-prefixes-map, $prefix)
+        let $uri as xs:string? := if (fn:exists ($uri) or ($prefix = "_")) then $uri else fn:namespace-uri-for-prefix ($prefix, $node)
 	let $_ := if (fn:exists ($uri)) then map:put ($referenced-prefixes, $prefix, $uri) else ()
 
         return $uri
@@ -467,12 +467,7 @@ declare private function resolve-curie (
 
 	return
 	if ($prefix = "_")
-	then
-		if (map:get ($prefix-map, "_"))
-		then (
-			map:delete ($prefix-map, "_"),
-			fn:concat ("<", $ns-uri, $suffix, ">")
-		) else $curie
+	then $curie
 	else
 		if ((($ns-uri eq $dfvocab) and ($suffix = $htmlrels)) or ($prefix and $ns-uri))
 		then fn:concat ("<", $ns-uri, $suffix, ">")
