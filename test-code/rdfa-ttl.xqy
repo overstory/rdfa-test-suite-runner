@@ -167,6 +167,7 @@ declare private function emit-prefixes (
 ) as xs:string*
 {
 	(
+		let $_ := map:delete ($prefix-map, "_")
 		let $_ :=
 			for $key in map:keys ($minimal-prefixes)
 			return if (map:get ($prefix-map, $key)) then () else map:put ($prefix-map, $key, map:get ($minimal-prefixes, $key))
@@ -466,7 +467,12 @@ declare private function resolve-curie (
 
 	return
 	if ($prefix = "_")
-	then $curie
+	then
+		if (map:get ($prefix-map, "_"))
+		then (
+			map:delete ($prefix-map, "_"),
+			fn:concat ("<", $ns-uri, $suffix, ">")
+		) else $curie
 	else
 		if ((($ns-uri eq $dfvocab) and ($suffix = $htmlrels)) or ($prefix and $ns-uri))
 		then fn:concat ("<", $ns-uri, $suffix, ">")
