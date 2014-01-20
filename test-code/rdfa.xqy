@@ -190,8 +190,9 @@ declare function ml:subject($node as node(), $base as xs:string) {
     
     if ($node/@about[not(.='[]')])
     then ml:safe-resolve-uri-or-curie($node/@about, $node, $base)
-    else if ($node/@src)
-         then ml:safe-resolve-uri($node/@src, $base)
+    (: @src should not be a subject:)
+    (: else if ($node/@src)
+         then ml:safe-resolve-uri($node/@src, $base):)
          else if (local-name($node) = ("head", "body"))
               then $base
               
@@ -285,14 +286,6 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
                     $lang,
                     
                     
-                    
-                   (: "testsubj: ", $subj,
-                    "test effective-dt: ", $effective-dt,
-                    "test isXML: ", $isXML,
-                    "test prop: ", $prop,:)
-                    
-
-
                     (: proper XML Literal?? :)
                     if ($isXML)
                     then (attribute rdf:parseType { "Literal" } , for $n in $node/node() return ml:deep-copy($n) )
@@ -317,7 +310,7 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
 };
 
 declare function ml:relrev($node as node(), $val as xs:string, $relorrev, $base as xs:string) as element()* {
-    if ($node/@resource or $node/@href)
+    if ($node/@resource or $node/@href or $node/@src)
     then ml:relrev-immed($node, $val, $relorrev, $base)
     else (ml:relrev-hanging($node, $val, $relorrev, $base), ml:relrev-hanging-bnode($node, $val, $relorrev, $base))
 };
@@ -326,8 +319,13 @@ declare function ml:relrev($node as node(), $val as xs:string, $relorrev, $base 
 declare function ml:relrev-immed($node as node(), $val as xs:string, $relorrev, $base as xs:string) as element()* {
     for $relv in if (normalize-space($val) eq "") then () else tokenize($val, "\s+")
     let $prefix := substring-before($relv, ":")
+    (: object for rel/rev can be @resource - @href - @src in this specific order :)
     let $locobj := if ($node/@resource)
                    then ml:safe-resolve-uri-or-curie($node/@resource, $node, $base)
+                   else if ($node/@href)
+                   then  ml:safe-resolve-uri-or-curie($node/@href, $node, $base)
+                   else if ($node/@src)
+                   then  ml:safe-resolve-uri-or-curie($node/@src, $node, $base)
                    else  ml:safe-resolve-uri($node/@href, $base)
 
     let $locsbj := ml:subject($node, $base)
