@@ -115,8 +115,8 @@ declare function ml:parse_rdfa (
                 let $base := 
                         if ($node/@xml:base)
                         then ($node/@xml:base)
-                         else if (ancestor::*[@xml:base][1])
-                            then (ancestor::*[@xml:base][1])
+                         else if ($node/ancestor::*[@xml:base][1])
+                            then ($node/ancestor::*[@xml:base][1])
                             else if ($doc//html:head/html:base/@href)
                                 then ($doc//html:head/html:base/@href)
                                 else if ($doc/self::*/@xml:base)
