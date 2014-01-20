@@ -197,9 +197,9 @@ declare function ml:subject($node as node(), $base as xs:string) {
     
     if ($node/@about[not(.='[]')])
     then ml:safe-resolve-uri-or-curie($node/@about, $node, $base)
-     else if ($node/@href and ($node/@property) and ($node/@content))
+     else if ($node/@href and ($node/@property) and (($node/@content or $node/@datatype)))
          then ml:safe-resolve-uri($node/@href, $base)
-         else if ($node/@src and ($node/@property) and ($node/@content))
+         else if ($node/@src and ($node/@property) and (($node/@content or $node/@datatype)))
             then ml:safe-resolve-uri($node/@src, $base)
          (:else if (local-name($node) = ("head", "body"))
               then $base:)
@@ -261,11 +261,11 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
     
     let $bnode-ref := ml:generate-bnode-id($node, "typeof")
     
-    let $locobj := if ($node/@resource and not($node/@content))
+    let $locobj := if ($node/@resource and not($node/@content) and not($node/@datatype))
                    then ml:safe-resolve-uri-or-curie($node/@resource, $node, $base)
-                   else if ($node/@href and not($node/@content))
+                   else if ($node/@href and not($node/@content) and not($node/@datatype))
                    then ml:safe-resolve-uri($node/@href, $base)
-                   else if ($node/@src and not($node/@content))
+                   else if ($node/@src and not($node/@content) and not($node/@datatype))
                    then ml:safe-resolve-uri($node/@src, $base)
                    else ()
                    
@@ -276,6 +276,7 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
         if ($subj)
         then
            ( 
+           
             <rdf:Description>
             {
                 
