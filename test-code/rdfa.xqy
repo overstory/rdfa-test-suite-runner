@@ -120,10 +120,17 @@ declare function ml:parse_rdfa (
                             else if ($doc//html:head/html:base/@href)
                                 then ($doc//html:head/html:base/@href)
                                 else if ($doc/self::*/@xml:base)
-                                    then($doc/self::*/@xml:base)
+                                    then ($doc/self::*/@xml:base)
                                     else if ($url)
                                         then $url
                                         else $default-base
+                let $dfvocab := 
+                    if ($node/@vocab)
+                    then ($node/@vocab)
+                    else if ($node/ancestor::*[@vocab][1])
+                        then ($node/ancestor::*[@vocab][1])
+                        else ()
+                
                  
                 return
                 (                 
@@ -193,8 +200,8 @@ declare function ml:subject($node as node(), $base as xs:string) {
     (: @src should not be a subject:)
     (: else if ($node/@src)
          then ml:safe-resolve-uri($node/@src, $base):)
-         else if (local-name($node) = ("head", "body"))
-              then $base
+         (:else if (local-name($node) = ("head", "body"))
+              then $base:)
               
                (: Marcin change 
                else if ($node/@typeof)
@@ -255,8 +262,10 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
     
     let $locobj := if ($node/@resource)
                    then ml:safe-resolve-uri-or-curie($node/@resource, $node, $base)
-                   else  ml:safe-resolve-uri($node/@href, $base)
-
+                   else if ($node/@href)
+                   then ml:safe-resolve-uri($node/@href, $base)
+                   else ml:safe-resolve-uri($node/@src, $base)
+                   
     let $locsbj := ml:subject($node, $base)
 
     where 1
@@ -289,10 +298,10 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
                     (: proper XML Literal?? :)
                     if ($isXML)
                     then (attribute rdf:parseType { "Literal" } , for $n in $node/node() return ml:deep-copy($n) )
-                        else if ($node/@typeof and not($node/@about))
+                        else if ($node/@typeof and not($node/@about) and not($node/@resource) and not($node/@href) and not($node/@src))
                         then 
                         ( 
-                            attribute rdf:nodeID {string($bnode-ref)}
+                            attribute rdf:nodeID { string($bnode-ref) }
                         )
                         else if ($locobj and not($node/@rel) and not($node/@rev))
                         then 
