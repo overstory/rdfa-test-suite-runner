@@ -108,15 +108,25 @@ declare function ml:parse_rdfa (
         <rdf:RDF>{
                 ml:namespaces-from-prefix-map ($prefixes-map),
                 $doc/namespace::*,
-            let $base := if ($doc//html:head/html:base/@href)
-                         then $doc//html:head/html:base/@href
-                         else if ($doc/self::*/@xml:base)
-                            then($doc/self::*/@xml:base)
-                            else if ($url)
-                                 then $url
-                                 else $default-base
+            
             for $node in $doc/descendant-or-self::*
             return (
+            
+                let $base := 
+                        if ($node/@xml:base)
+                        then ($node/@xml:base)
+                         else if (ancestor::*[@xml:base][1])
+                            then (ancestor::*[@xml:base][1])
+                            else if ($doc//html:head/html:base/@href)
+                                then ($doc//html:head/html:base/@href)
+                                else if ($doc/self::*/@xml:base)
+                                    then($doc/self::*/@xml:base)
+                                    else if ($url)
+                                        then $url
+                                        else $default-base
+                 
+                return
+                (                 
             
                 if ($node/@property)
                 then ml:property($node, string(normalize-space($node/@property)), $base)
@@ -133,6 +143,8 @@ declare function ml:parse_rdfa (
                 if ($node/@typeof)
                 then ml:typeof($node, string(normalize-space($node/@typeof)), $base)
                 else ()
+                
+                )
 
             )
         }</rdf:RDF>
