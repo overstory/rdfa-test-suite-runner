@@ -197,9 +197,10 @@ declare function ml:subject($node as node(), $base as xs:string) {
     
     if ($node/@about[not(.='[]')])
     then ml:safe-resolve-uri-or-curie($node/@about, $node, $base)
-    (: @src should not be a subject:)
-    (: else if ($node/@src)
-         then ml:safe-resolve-uri($node/@src, $base):)
+     else if ($node/@href and ($node/@property) and ($node/@content))
+         then ml:safe-resolve-uri($node/@href, $base)
+         else if ($node/@src and ($node/@property) and ($node/@content))
+            then ml:safe-resolve-uri($node/@src, $base)
          (:else if (local-name($node) = ("head", "body"))
               then $base:)
               
@@ -260,11 +261,13 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
     
     let $bnode-ref := ml:generate-bnode-id($node, "typeof")
     
-    let $locobj := if ($node/@resource)
+    let $locobj := if ($node/@resource and not($node/@content))
                    then ml:safe-resolve-uri-or-curie($node/@resource, $node, $base)
-                   else if ($node/@href)
+                   else if ($node/@href and not($node/@content))
                    then ml:safe-resolve-uri($node/@href, $base)
-                   else ml:safe-resolve-uri($node/@src, $base)
+                   else if ($node/@src and not($node/@content))
+                   then ml:safe-resolve-uri($node/@src, $base)
+                   else ()
                    
     let $locsbj := ml:subject($node, $base)
 
