@@ -102,8 +102,8 @@ declare function ml:parse_rdfa (
 {
                 (: ToDo: change calls to namespace-uri-for-prefix to a local funciton that will look in the map
                 :)
-
-        ml:load-namespace-map-from-prefixes ($doc/@prefix/fn:string()),
+        (: @prefix can be anywhere in the tree :)
+        ml:load-namespace-map-from-prefixes ($doc//@prefix/fn:string()),
 
         <rdf:RDF>{
                 ml:namespaces-from-prefix-map ($prefixes-map),
