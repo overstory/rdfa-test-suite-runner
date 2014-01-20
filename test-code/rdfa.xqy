@@ -124,7 +124,7 @@ declare function ml:parse_rdfa (
                                     else if ($url)
                                         then $url
                                         else $default-base
-                let $dfvocab := 
+                let $vocab := 
                     if ($node/@vocab)
                     then ($node/@vocab)
                     else if ($node/ancestor::*[@vocab][1])
@@ -276,7 +276,6 @@ declare function ml:property($node as node(), $val as xs:string, $base as xs:str
         if ($subj)
         then
            ( 
-           
             <rdf:Description>
             {
                 
@@ -501,7 +500,11 @@ declare function ml:generate-bnode-id($node as element(), $extra as xs:string) a
 (: curie parts: 1:prefix, 2:suffix, 3:uri  3 will be missing for invalid CURIEs :)
 declare function ml:curie-parse($curie as xs:string, $context as element()) as xs:string* {
     let $prefix := substring-before($curie, ":")
-    let $nsuri  := if ($prefix eq "" or $prefix eq "[") then $dfvocab else ml:namespace-uri-for-prefix($prefix, $context)
+    let $nsuri  := if ($prefix eq "" or $prefix eq "[") 
+    then (
+    $dfvocab
+    )
+    else ml:namespace-uri-for-prefix($prefix, $context)
     let $suffix := if ($nsuri eq $dfvocab)
                    then if (starts-with($curie, ":"))
                         then substring-after($curie, ":")
