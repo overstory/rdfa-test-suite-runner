@@ -88,7 +88,7 @@ declare private variable $referenced-prefixes := map:map();
 
 declare function rdfa-to-ttl (
         $doc as node()
-) as xs:string
+) (: as xs:string :)
 {
 	rdfa-to-ttl ($doc, ())
 };
@@ -96,14 +96,14 @@ declare function rdfa-to-ttl (
 declare function rdfa-to-ttl (
         $doc-node as node(),
         $uri as xs:string?
-) as xs:string
+) (: as xs:string :)
 {
 	let $root := if ($doc-node instance of document-node()) then $doc-node/* else $doc-node
 	let $base-uri := ($root/xhtml:head/xhtml:base/@href, $root/@xml:base, $uri, $default-base-uri)[1]
 	let $_ := map:clear ($referenced-prefixes)
 	let $prefix-map := context-prefix-map ($default-prefixes-map, $root/@prefix/fn:string())
 
-	return render-ttl (parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
+	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
 };
 
 (: ----------------------------------------------------------------- :)
@@ -111,7 +111,7 @@ declare function rdfa-to-ttl (
 declare private function render-ttl (
 	$triples as element(triple)*,
 	$prefix-map as map:map
-) as xs:string
+) (: as xs:string :)
 {
 	(:
 	 emit prefixes
@@ -142,7 +142,8 @@ declare private function parse-rdfa (
 		let $my-prefixes-map := context-prefix-map ($prefix-map, $node/@prefix/fn:string())
 
 		return (
-			triples-for-node ($node, $parent-node, $base-uri, $my-prefixes-map),
+			triples-for-node ($node, $parent-node, $base-uri, $my-prefixes-map)
+			,
 			parse-rdfa ($node/*, $node, $base-uri, $my-prefixes-map)
 		)
 	default return gen-error-triple ("rdfa:Error")
@@ -195,7 +196,9 @@ declare private function emit-tuple (
 {
 	fn:concat ($object,
 		if ($object/@xml:lang) then fn:concat ("@", $object/@xml:lang) else (),
-		if ($object/@datatype) then fn:concat ("^^", $object/@datatype) else ()
+		if ($object/@datatype) then fn:concat ("^^", $object/@datatype) 
+		else if ($object/@rdf:datatype) then fn:concat ("^^", $object/@rdf:datatype)
+		else ()
 	)
 };
 
@@ -281,6 +284,7 @@ declare private function gen-property (
 
 	return
 	<triple>
+	    <!--<marcin-tests>{ $datatype }</marcin-tests>-->
 		<subject>{ $subject }</subject>
 		<predicate>{ $predicate }</predicate>
 		<object>{
@@ -426,7 +430,12 @@ declare function effective-datatype (
 	$prefix-map as map:map
 ) as xs:string?
 {
-	resolve-curie ($node/@datatype, $node, $prefix-map)  (: ToDo: recognize @rdf:datatype also? :)
+	if ($node/@datatype)
+	then ( resolve-curie ($node/@datatype, $node, $prefix-map) ) 
+	else if ($node/@rdf:datatype)
+	then ( resolve-curie ($node/@rdf:datatype, $node, $prefix-map) )
+	else ()
+	
 };
 
 declare function effective-lang (
