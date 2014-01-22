@@ -103,7 +103,7 @@ declare function rdfa-to-ttl (
 	let $_ := map:clear ($referenced-prefixes)
 	let $prefix-map := context-prefix-map ($default-prefixes-map, $root/@prefix/fn:string())
 
-	return render-ttl (  parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
+	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
 };
 
 (: ----------------------------------------------------------------- :)
@@ -194,16 +194,26 @@ declare private function emit-tuple (
 	$object as element()
 ) as xs:string
 {
-    
-    
 	fn:concat (
-	    if ($object/@rdf:parseType = 'Literal') then ( '"""' ) else (),
-	    if ($object/@rdf:parseType = 'Literal') then ( xdmp:quote ( deep-copy( $object/node() ) ) ) else ( $object ),
-	    if ($object/@rdf:parseType = 'Literal') then ( '"""' ) else (),
-	    if ($object/@rdf:parseType = 'Literal') then ( '^^rdf:XMLLiteral' ) else(),
-		if ($object/@xml:lang) then fn:concat ("@", $object/@xml:lang) else (),
-		if ($object/@datatype) then fn:concat ("^^", $object/@datatype) 
-		else if ($object/@rdf:datatype) then fn:concat ("^^", $object/@rdf:datatype)
+	    if ($object/@rdf:parseType = 'Literal') 
+	    then ( '"""' ) else (),
+	    
+	    if ($object/@rdf:parseType = 'Literal') 
+	    then ( xdmp:quote ( deep-copy( $object/node() ) ) ) else ( $object ),
+	    
+	    if ($object/@rdf:parseType = 'Literal') 
+	    then ( '"""' ) else (),
+	    
+	    if ($object/@rdf:parseType = 'Literal') 
+	    then ( '^^rdf:XMLLiteral' ) else(),
+	    
+		if ($object/@xml:lang) 
+		then fn:concat ("@", $object/@xml:lang) else (),
+		
+		if ($object/@datatype) 
+		then fn:concat ("^^", $object/@datatype) 
+		else if ($object/@rdf:datatype) 
+		then fn:concat ("^^", $object/@rdf:datatype)
 		else ()
 	)
 	
@@ -363,7 +373,7 @@ declare function gen-relrev-immediate (
 		if ($node/@resource)
 		then resolve-uri-or-curie ($node/@resource, $node, $base-uri, $prefix-map)
 		else resolve-uri ($node/@href, $base-uri)
-	let $locsbj := subject ($node, $parent-node, $base-uri, $prefix-map)
+	let $locsbj := subject ($node, (), $base-uri, $prefix-map)
 	let $effective-sbj := if ($relorrev eq "rel") then $locsbj else $locobj
 	let $effective-obj := if ($relorrev eq "rel") then $locobj else $locsbj
 
