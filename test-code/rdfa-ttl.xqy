@@ -311,7 +311,6 @@ declare private function gen-property (
 
 	return
 	<triple>
-	    <marcin> { 'inside property' } </marcin>
 		<subject>{ $subject }</subject>
 		<predicate>{ $predicate }</predicate>
 		<object>{
