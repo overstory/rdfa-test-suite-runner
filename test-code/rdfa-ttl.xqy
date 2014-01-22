@@ -253,7 +253,7 @@ declare private function object (
 ) as item()*
 {
 	if ($is-xml)
-	then $node/*
+	then ( $node/* )
 	else
 		if ($node/@typeof and not($node/@about))
 		then gen-blank-node-uri ($node)   (: CheckMe :)
@@ -275,7 +275,7 @@ declare private function gen-property (
 {
 	for $prop in tokenize ($props, "\s+")
 	let $predicate := resolve-uri-or-curie ($prop, $node, $base-uri, $prefix-map)
-	let $is-xml as xs:boolean := is-xml ($node, $base-uri)
+	let $is-xml as xs:boolean := is-xml ($node, $base-uri, $prefix-map)
 	let $datatype := if ($is-xml) then () else effective-datatype ($node, $prefix-map)
 	let $lang := effective-lang ($node, $parent-node)	(: ToDo: use ancestor-or-self:: instead? :)
 	let $parse-type := if ($is-xml) then "Literal" else ()
@@ -284,7 +284,6 @@ declare private function gen-property (
 
 	return
 	<triple>
-	    <!--<marcin-tests>{ $datatype }</marcin-tests>-->
 		<subject>{ $subject }</subject>
 		<predicate>{ $predicate }</predicate>
 		<object>{
@@ -515,6 +514,18 @@ declare function wrap-uri (
 	fn:concat ("<", $uri, ">")
 };
 
+declare function unwrap-uri (
+	$uri
+) as xs:string
+{
+    let $string-length as xs:int := fn:string-length($uri) - 2
+    return
+    (
+        fn:substring($uri, 2, $string-length)
+    )
+	
+};
+
 (: ----------------------------------------------------------------- :)
 
 declare private function gen-blank-node-uri (
@@ -526,11 +537,31 @@ declare private function gen-blank-node-uri (
 
 declare private function is-xml (
 	$node as element(),
-	$base-uri as xs:string
+	$base-uri as xs:string,
+	$prefix-map as map:map
 ) as xs:boolean
 {
-	$node/@datatype and (resolve-uri ($node/@datatype, $base-uri) = $rdf-XMLLiteral)
+	$node/@datatype and (unwrap-uri(resolve-curie($node/@datatype, $node, $prefix-map)) = $rdf-XMLLiteral)
 };
+
+(: return a deep copy of the node and all children :)
+(:declare function deep-copy($node as node()) as node() {
+
+    typeswitch($node)
+    case element() return
+        element { node-name($node) }
+        {
+            $node/@*,
+            for $child in $node/node()
+            return
+                if ($child instance of element())
+                then deep-copy($child)
+                else $child
+          }
+    case attribute() return $node
+    case text() return $node
+    default return $node
+};:)
 
 (: ----------------------------------------------------------------- :)
 (: ----------------------------------------------------------------- :)
