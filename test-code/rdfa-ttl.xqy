@@ -232,24 +232,44 @@ declare private function subject (
 	$parent-node as element()?,
 	$base-uri as xs:string,
 	$prefix-map as map:map
-) as xs:string (: xs:anyURI :)
+) as xs:string? (: xs:anyURI :)
 {
-	if ($node/@about and fn:not ($node/@about = ("_:", "[_:]")))
-	then resolve-uri-or-curie ($node/@about, $node, $base-uri, $prefix-map)
-	else
-		if ($node/@src)
-		then resolve-uri ($node/@src/fn:string(), $base-uri)
-		else
-			if (fn:local-name ($node) = ("head", "body"))
-			then wrap-uri ($base-uri)
-			else
-				if ($node/@typeof)
-				then wrap-uri (gen-blank-node-uri ($node))
-				else
-					if (fn:exists ($parent-node/parent::*))
-					then subject ($parent-node, $parent-node/parent::*, $base-uri, $prefix-map)
-					else wrap-uri ($base-uri)
+       if ($node/@about and fn:not ($node/@about = ("_:", "[_:]")))
+       then resolve-uri-or-curie ($node/@about, $node, $base-uri, $prefix-map)
+         else if ($node/@href and ($node/@property) and (($node/@content or $node/@datatype)))
+         then resolve-uri-or-curie ($node/@href, $node, $base-uri, $prefix-map)
+            else if ($node/@src and ($node/@property) and (($node/@content or $node/@datatype)))
+            then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
+       		   else if ($node/@typeof)
+       		   then wrap-uri (gen-blank-node-uri ($node))
+       		      else if (fn:exists ($parent-node/parent::*))
+              				(:then subject ($parent-node, $parent-node/parent::*, $base-uri, $prefix-map):)
+              	      then subject-parent($node/parent::*, $base-uri, $prefix-map)
+              		  else wrap-uri ($base-uri)
 };
+
+declare private function subject-parent (
+    $node as element(),
+	$base-uri as xs:string,
+	$prefix-map as map:map
+) as xs:string?
+{
+
+    if ($node/@resource and fn:not ($node/@resource = ("[]")))
+    then resolve-uri-or-curie ($node/@resource, $node, $base-uri, $prefix-map)
+        else if ($node/@rel or $node/@rev)
+        then wrap-uri (gen-blank-node-uri ($node))
+            else if ($node/@about)
+            then resolve-uri-or-curie ($node/@about, $node, $base-uri, $prefix-map)
+                else if ($node/@typeof)
+                then wrap-uri (gen-blank-node-uri ($node))
+                    else if ($node/..)
+                         then subject-parent($node/parent::*, $base-uri, $prefix-map)
+                         else wrap-uri ($base-uri)
+
+};
+
+
 
 
 declare private function object (
@@ -291,6 +311,7 @@ declare private function gen-property (
 
 	return
 	<triple>
+	    <marcin> { 'inside property' } </marcin>
 		<subject>{ $subject }</subject>
 		<predicate>{ $predicate }</predicate>
 		<object>{
