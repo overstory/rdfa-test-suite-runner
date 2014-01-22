@@ -103,7 +103,7 @@ declare function rdfa-to-ttl (
 	let $_ := map:clear ($referenced-prefixes)
 	let $prefix-map := context-prefix-map ($default-prefixes-map, $root/@prefix/fn:string())
 
-	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
+	return render-ttl (  parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
 };
 
 (: ----------------------------------------------------------------- :)
@@ -194,12 +194,19 @@ declare private function emit-tuple (
 	$object as element()
 ) as xs:string
 {
-	fn:concat ($object,
+    
+    
+	fn:concat (
+	    if ($object/@rdf:parseType = 'Literal') then ( '"""' ) else (),
+	    if ($object/@rdf:parseType = 'Literal') then ( xdmp:quote ( deep-copy( $object/node() ) ) ) else ( $object ),
+	    if ($object/@rdf:parseType = 'Literal') then ( '"""' ) else (),
+	    if ($object/@rdf:parseType = 'Literal') then ( '^^rdf:XMLLiteral' ) else(),
 		if ($object/@xml:lang) then fn:concat ("@", $object/@xml:lang) else (),
 		if ($object/@datatype) then fn:concat ("^^", $object/@datatype) 
 		else if ($object/@rdf:datatype) then fn:concat ("^^", $object/@rdf:datatype)
 		else ()
 	)
+	
 };
 
 (: ----------------------------------------------------------------- :)
@@ -253,7 +260,7 @@ declare private function object (
 ) as item()*
 {
 	if ($is-xml)
-	then ( $node/* )
+	then ( deep-copy($node/node()) )
 	else
 		if ($node/@typeof and not($node/@about))
 		then gen-blank-node-uri ($node)   (: CheckMe :)
@@ -545,7 +552,7 @@ declare private function is-xml (
 };
 
 (: return a deep copy of the node and all children :)
-(:declare function deep-copy($node as node()) as node() {
+declare function deep-copy($node as node()) as node() {
 
     typeswitch($node)
     case element() return
@@ -561,7 +568,7 @@ declare private function is-xml (
     case attribute() return $node
     case text() return $node
     default return $node
-};:)
+};
 
 (: ----------------------------------------------------------------- :)
 (: ----------------------------------------------------------------- :)
