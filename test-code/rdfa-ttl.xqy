@@ -103,7 +103,7 @@ declare function rdfa-to-ttl (
 	let $_ := map:clear ($referenced-prefixes)
 	let $prefix-map := context-prefix-map ($default-prefixes-map, $root/@prefix/fn:string())
 
-	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
+	return  render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
 };
 
 (: ----------------------------------------------------------------- :)
@@ -410,7 +410,7 @@ declare private function gen-rev (
 	then gen-relrev-immediate ($node, $parent-node, $val, "rev", $base-uri, $prefix-map)
 	else 
 	( 
-	   relrev-hanging ($node, $parent-node, $val, 'rel', $base-uri, $prefix-map)
+	   relrev-hanging ($node, $parent-node, $val, 'rev', $base-uri, $prefix-map)
 	)
 };
 
