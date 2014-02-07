@@ -373,7 +373,6 @@ declare private function gen-property (
 			if ($parse-type) then attribute rdf:parseType { $parse-type } else (),
 			$object
 		}</object>
-		<test>{$object}</test>
 	</triple>
 };
 
