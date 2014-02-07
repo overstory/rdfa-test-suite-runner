@@ -103,7 +103,7 @@ declare function rdfa-to-ttl (
 	let $_ := map:clear ($referenced-prefixes)
 	let $prefix-map := context-prefix-map ($default-prefixes-map, $root/@prefix/fn:string())
 
-	return render-ttl (  parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
+	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
 };
 
 (: ----------------------------------------------------------------- :)
@@ -410,7 +410,7 @@ declare private function gen-rev (
 	then gen-relrev-immediate ($node, $parent-node, $val, "rev", $base-uri, $prefix-map)
 	else 
 	( 
-	   (:relrev-hanging ($node, $parent-node, $val, 'rel', $base-uri, $prefix-map):)
+	   relrev-hanging ($node, $parent-node, $val, 'rel', $base-uri, $prefix-map)
 	)
 };
 
@@ -668,18 +668,35 @@ declare private function resolve-curie (
 	let $prefix := fn:substring-before ($curie, ":")
 	let $ns-uri := if (fn:not ($prefix) or (fn:starts-with ($curie, ":"))) then $dfvocab else namespace-uri-for-prefix ($prefix, $prefix-map, $node)
 	let $suffix :=
-		if (($ns-uri eq $dfvocab) and fn:not (fn:starts-with($curie, ":")))
-		then $curie
-		else fn:substring-after ($curie, ":")
+	   fn:substring-after ($curie, ":")
 
 	return
 	if ($prefix = "_")
 	then $curie
-	else
+	else if ($prefix = "" and fn:starts-with($curie, ':'))
+	then ( fn:concat("<", $dfvocab, $suffix, ">") )
+	else 
 		if ((($ns-uri eq $dfvocab) and ($suffix = $htmlrels)) or ($prefix and $ns-uri))
 		then fn:concat ("<", $ns-uri, $suffix, ">")
 		else ()
 };
+
+(:declare function ml:curie-parse($curie as xs:string, $context as element()) as xs:string* {
+    let $prefix := substring-before($curie, ":")
+    let $nsuri  := if ($prefix eq "" or $prefix eq "[") 
+    then (
+    $dfvocab
+    )
+    else ml:namespace-uri-for-prefix($prefix, $context)
+    let $suffix := if ($nsuri eq $dfvocab)
+                   then if (starts-with($curie, ":"))
+                        then substring-after($curie, ":")
+                        else if (starts-with($curie, "[:"))
+                        then substring-after($curie, "[:")
+                        else $curie
+                   else substring-after($curie, ":")
+    return ($prefix, $suffix, $nsuri)
+};:)
 
 declare function resolve-uri (
 	$val as xs:string,
