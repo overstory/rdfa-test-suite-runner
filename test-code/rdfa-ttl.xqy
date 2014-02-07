@@ -722,7 +722,7 @@ declare function unwrap-uri (
 
 declare function generate-blank-node-id($node as element()) as xs:string {
     (:concat("node", string($node/generate-id(.)))):)
-    concat("node", count($node/preceding::*), local-name($node), count($node/ancestor::*) )
+    concat("node", string($node/generate-id(.)))
     
 };
 
