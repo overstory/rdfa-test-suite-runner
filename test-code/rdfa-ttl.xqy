@@ -544,12 +544,26 @@ declare private function gen-typeof (
 ) as element(triple)*
 {
 	for $type in tokenize ($props, "\s+")
-	let $subject := subject ($node, $parent-node, $base-uri, $prefix-map)
+	(:let $subject := subject ($node, $parent-node, $base-uri, $prefix-map):)
+	(: todo: make function subject-typeof :)
+	let $local-subject :=
+	           if ($node/@about)
+                   then resolve-uri-or-curie($node/@about, $node, $base-uri, $prefix-map)
+                   else if ($node/@src)
+                        then resolve-uri-or-curie($node/@src, $node, $base-uri, $prefix-map)
+                        else if (local-name($node) = ("head", "body"))
+                             then $base-uri
+                             else if ($node/@resource and not($node/(@rel | @rev)))
+                                  then resolve-uri-or-curie($node/@resource, $node, $base-uri, $prefix-map)
+                                  else if ($node/@href and not($node/(@rel | @rev)))
+                                       then resolve-uri-or-curie($node/@href, $node, $base-uri, $prefix-map)
+                                       else gen-blank-node-uri($node)
+	
 	let $rsc := resolve-uri-or-curie ($type, $node, $base-uri, $prefix-map)
 
 	return
 	<triple>
-		<subject>{ $subject }</subject>
+		<subject>{ $local-subject }</subject>
 		<predicate>rdf:type</predicate>
 		<object>{ $rsc }</object>
 	</triple>
