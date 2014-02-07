@@ -103,7 +103,7 @@ declare function rdfa-to-ttl (
 	let $_ := map:clear ($referenced-prefixes)
 	let $prefix-map := context-prefix-map ($default-prefixes-map, $root/@prefix/fn:string())
 
-	return  render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
+	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
 };
 
 (: ----------------------------------------------------------------- :)
@@ -340,7 +340,7 @@ declare private function object (
 		else
 			if ($node/@resource and fn:not ($node/@rel) and fn:not ($node/@rev))
 			then resolve-uri-or-curie ($node/@resource, $node, $base-uri, $prefix-map)
-			else fn:concat ('"', fn:normalize-space (($node/@content, $node, "")[1]), '"')
+			else fn:concat ('"""', ($node/@content, $node, "")[1], '"""')
 	
 };
 
@@ -373,6 +373,7 @@ declare private function gen-property (
 			if ($parse-type) then attribute rdf:parseType { $parse-type } else (),
 			$object
 		}</object>
+		<test>{$object}</test>
 	</triple>
 };
 
