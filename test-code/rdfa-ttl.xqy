@@ -23,6 +23,8 @@ declare variable $htmlrels :=
 	"meta", "next", "p3pv1", "prev", "role", "section", "start",
 	"stylesheet", "subsection", "up" );
 
+declare variable $vocabulary-terms := ( "describedby", "license", "role" );
+
 (: Preloaded with default vocabulary prefixes.  See: http://www.w3.org/2011/rdfa-context/rdfa-1.1 :)
 declare variable $default-prefixes-map := map:map (
 	<map:map xmlns:map="http://marklogic.com/xdmp/map" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -680,7 +682,7 @@ declare private function resolve-curie (
 		if (fn:starts-with ($val, "[") and fn:ends-with ($val, "]"))
 		then fn:substring-after (fn:substring-before ($val, "]"), "[")
 		else $val
-	let $prefix := fn:substring-before ($curie, ":")
+	let $prefix := if ($curie = $vocabulary-terms) then $curie else fn:substring-before ($curie, ":")
 	let $ns-uri := if (fn:not ($prefix) or (fn:starts-with ($curie, ":"))) then $dfvocab else namespace-uri-for-prefix ($prefix, $prefix-map, $node)
 	let $suffix := fn:substring-after ($curie, ":")
 
