@@ -199,7 +199,7 @@ declare private function emit-tuple (
 	fn:concat (
 		if ($object/@rdf:parseType = 'Literal')
 		then quote-xml ($object)
-		else $object,
+		else compact-uri ($object),
 
 		if ($object/(@datatype|@rdf:datatype))
 		then fn:concat ("^^", ($object/@datatype, $object/@rdf:datatype)[1])
@@ -216,6 +216,38 @@ declare private function quote-xml (
 ) as xs:string
 {
 	fn:concat ('"""', xdmp:quote ($node/node()), '"""^^rdf:XMLLiteral')
+};
+
+declare private function compact-uri (
+	$uri as xs:string
+) as xs:string
+{
+	if (fn:not (fn:starts-with ($uri, "<") and fn:ends-with ($uri, ">")))
+	then $uri
+	else
+		let $bare-uri := fn:substring-after (fn:substring-before ($uri, ">"), "<")
+		let $prefix := find-prefix-for ($bare-uri)
+		let $ns-uri := map:get ($referenced-prefixes, $prefix)
+		let $local-part := fn:substring-after ($bare-uri, $ns-uri)
+
+		return
+		if ($prefix and fn:not (fn:contains ($local-part, ":")))
+		then fn:concat ($prefix, ":", $local-part)
+		else $uri
+};
+
+declare private function find-prefix-for (
+	$uri as xs:string
+) as xs:string?
+{
+	(
+		for $prefix in map:keys ($referenced-prefixes)
+		let $ns-uri := (map:get ($referenced-prefixes, $prefix)	)[1]
+		return
+		if (fn:starts-with ($uri, $ns-uri))
+		then $prefix
+		else ()
+	)[1]
 };
 
 (: ----------------------------------------------------------------- :)
@@ -470,84 +502,82 @@ declare function hanging-bnode (
 	$node as node()
 ) as node()*
 {
-    (: find all descendant nodes with hanging-triple-completing-via-the-same-bnode attributes... :)
-    $node//*[@rel or @rev or @property][count(($node//* intersect ./ancestor::*)/(@rel | @rev | @property)) eq 0]
-      (: but exclude stuff we've already seen, and stuff more than one level deep
-         (the deeper stuff is "yet to be seen") :)
+	(: find all descendant nodes with hanging-triple-completing-via-the-same-bnode attributes... :)
+	$node//*[@rel or @rev or @property][count(($node//* intersect ./ancestor::*)/(@rel | @rev | @property)) eq 0]
+	(: but exclude stuff we've already seen, and stuff more than one level deep
+	 (the deeper stuff is "yet to be seen") :)
 };
 
 declare function relrev-hanging (
-    $node as node(),
-    $parent-node as element()?,
-    $val as xs:string,
-    $relorrev,
-    $base-uri as xs:string,
-    $prefix-map as map:map
+	$node as node(),
+	$parent-node as element()?,
+	$val as xs:string,
+	$relorrev as xs:string,
+	$base-uri as xs:string,
+	$prefix-map as map:map
 ) as element()*
 {
 
-for $rel-rev in if (normalize-space($val) eq "") then () else tokenize($val, "\s+")
-    let $prefix := substring-before($rel-rev, ":")
-    let $local-subject := subject($node, (), $base-uri, $prefix-map)
-    for $hang-desc in hanging-descendants($node)
-    let $local-object :=
-                (:
-                This needs to be handled somehow!
-                if ($hang-desc/@about[. = '[_:]'])
-                then ( wrap-uri(gen-blank-node-uri(@about/string())) )
-                   else :)
-                   if (has-about ($hang-desc/@about))
-                   then resolve-uri-or-curie($hang-desc/@about, $hang-desc, $base-uri, $prefix-map)
-                   else if ($hang-desc/@src)
-                        then resolve-uri-or-curie($hang-desc/@src, $hang-desc, $base-uri, $prefix-map)
-                        else if ($hang-desc/@typeof)
-                             then gen-blank-node-uri($hang-desc)
-                             else if ($hang-desc/(@rel | @rev))
-                                  then ()
-                                  else if (has-resource ($hang-desc/@resource))
-                                       then resolve-uri-or-curie($hang-desc/@resource, $hang-desc, $base-uri, $prefix-map)
-                                       else if ($hang-desc/@href)
-                                            then resolve-uri-or-curie($hang-desc/@href, $hang-desc, $base-uri, $prefix-map)
-                                            else gen-blank-node-uri($hang-desc)
-    let $subject := if ($relorrev eq "rel") then $local-subject else $local-object
-    let $object := if ($relorrev eq "rel") then $local-object else $local-subject
-    return
-    (
-        if ($local-subject and $local-object)
-        then
-        (
-            <triple>
-                <subject>{ $subject }</subject>
-                <predicate>{ $rel-rev }</predicate>
-                <object>{ $object }</object>
-            </triple>
-        )
-        else ()
-    )
+	for $rel-rev in if (normalize-space($val) eq "") then () else tokenize($val, "\s+")
+	let $prefix := substring-before($rel-rev, ":")
+	let $local-subject := subject($node, (), $base-uri, $prefix-map)
+	for $hang-desc in hanging-descendants($node)
+	let $local-object :=
+		(:
+		This needs to be handled somehow!
+		if ($hang-desc/@about[. = '[_:]'])
+		then ( wrap-uri(gen-blank-node-uri(@about/string())) )
+		   else :)
+		   if (has-about ($hang-desc/@about))
+		   then resolve-uri-or-curie ($hang-desc/@about, $hang-desc, $base-uri, $prefix-map)
+		   else if ($hang-desc/@src)
+			then resolve-uri-or-curie ($hang-desc/@src, $hang-desc, $base-uri, $prefix-map)
+			else if ($hang-desc/@typeof)
+			     then gen-blank-node-uri ($hang-desc)
+			     else if ($hang-desc/(@rel | @rev))
+				  then ()
+				  else if (has-resource ($hang-desc/@resource))
+				       then resolve-uri-or-curie ($hang-desc/@resource, $hang-desc, $base-uri, $prefix-map)
+				       else if ($hang-desc/@href)
+					    then resolve-uri-or-curie ($hang-desc/@href, $hang-desc, $base-uri, $prefix-map)
+					    else gen-blank-node-uri ($hang-desc)
+	let $subject := if ($relorrev eq "rel") then $local-subject else $local-object
+	let $object := if ($relorrev eq "rel") then $local-object else $local-subject
+
+	return
+	if ($local-subject and $local-object)
+	then
+		<triple>
+			<subject>{ $subject }</subject>
+			<predicate>{ $rel-rev }</predicate>
+			<object>{ $object }</object>
+		</triple>
+	else ()
 };
 
 declare function relrev-hanging-bnode(
-    $node as node(),
-    $val as xs:string,
-    $relorrev,
-    $base-uri as xs:string,
-    $prefix-map as map:map
+	$node as node(),
+	$val as xs:string,
+	$relorrev as xs:string,
+	$base-uri as xs:string,
+	$prefix-map as map:map
 ) as element()*
 {
-    for $rel-rev in if (normalize-space($val) eq "") then () else tokenize($val, "\s+")
-    let $local-subject := subject($node, (), $base-uri, $prefix-map)
-    let $local-object := gen-blank-node-uri($node)
-    let $subject := if ($relorrev eq "rel") then $local-subject else $local-object
-    let $object := if ($relorrev eq "rel") then $local-object else $local-subject
-    return
-        if (hanging-bnode($node))
-        then
-            <triple>
-                <subject>{ $subject }</subject>
-                <predicate>{ $rel-rev }</predicate>
-                <object>{ $object }</object>
-            </triple>
-        else ()
+	for $rel-rev in if (normalize-space($val) eq "") then () else tokenize($val, "\s+")
+	let $local-subject := subject($node, (), $base-uri, $prefix-map)
+	let $local-object := gen-blank-node-uri($node)
+	let $subject := if ($relorrev eq "rel") then $local-subject else $local-object
+	let $object := if ($relorrev eq "rel") then $local-object else $local-subject
+
+	return
+	if (hanging-bnode($node))
+	then
+		<triple>
+			<subject>{ $subject }</subject>
+			<predicate>{ $rel-rev }</predicate>
+			<object>{ $object }</object>
+		</triple>
+	else ()
 };
 
 
@@ -740,41 +770,28 @@ declare private function resolve-uri-or-curie (
 };
 
 declare function wrap-uri (
-	$uri
+	$uri as xs:string
 ) as xs:string
 {
 	fn:concat ("<", $uri, ">")
 };
 
 declare function unwrap-uri (
-	$uri
+	$uri as xs:string
 ) as xs:string
 {
-    let $string-length as xs:int := fn:string-length($uri) - 2
-    return
-    (
-        fn:substring($uri, 2, $string-length)
-    )
+    let $string-length as xs:int := fn:string-length ($uri) - 2
 
+    return fn:substring ($uri, 2, $string-length)
 };
 
 (: ----------------------------------------------------------------- :)
 
-(:declare private function gen-blank-node-uri (
+declare function gen-blank-node-uri (
 	$node as element()
 ) as xs:string
 {
-	fn:concat ("_:bnode", xdmp:random())
-};:)
-
-declare function generate-blank-node-id($node as element()) as xs:string {
-    (:concat("node", string($node/generate-id(.)))):)
-    concat("node", string($node/generate-id(.)))
-
-};
-
-declare function gen-blank-node-uri($node as element()) as xs:string {
-    concat("_:b", generate-blank-node-id($node))
+    concat("_:b", $node/fn:generate-id($node))
 };
 
 
@@ -784,7 +801,7 @@ declare private function is-xml (
 	$prefix-map as map:map
 ) as xs:boolean
 {
-	$node/@datatype and (unwrap-uri(resolve-curie($node/@datatype, $node, $prefix-map)) = $rdf-XMLLiteral)
+	$node/@datatype and (unwrap-uri (resolve-curie ($node/@datatype, $node, $prefix-map)) = $rdf-XMLLiteral)
 };
 
 (: function mapping will cause empty sequence result if $about is empty, which evaluates as false :)
