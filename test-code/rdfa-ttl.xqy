@@ -201,13 +201,13 @@ declare private function emit-tuple (
 		then quote-xml ($object)
 		else $object,
 
-		if ($object/@xml:lang)
-		then fn:concat ("@", $object/@xml:lang)
-		else (),
-
 		if ($object/(@datatype|@rdf:datatype))
 		then fn:concat ("^^", ($object/@datatype, $object/@rdf:datatype)[1])
-		else ()
+		else
+			if ($object/@xml:lang)
+			then fn:concat ("@", $object/@xml:lang/fn:string())
+			else ()
+
 	)
 };
 
@@ -658,8 +658,8 @@ declare function effective-lang (
 	$parent-node as element()
 ) as attribute()?
 {
-	if ($node/@xml:lang)
-	then $node/@xml:lang
+	if ($node/(@xml:lang|@lang))
+	then attribute xml:lang { (($node/@xml:lang/fn:string()), $node/@lang/fn:string())[1] }
 	else (effective-lang ($parent-node, $node/parent::*))
 
 	(: alternative: :)
