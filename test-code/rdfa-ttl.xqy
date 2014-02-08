@@ -372,6 +372,9 @@ declare private function gen-property (
 	let $object := object ($node, $is-xml, $base-uri, $prefix-map)
 
 	return
+	if (fn:starts-with ($predicate, "_:"))
+	then ()
+	else
 	<triple>
 		<subject>{ $subject }</subject>
 		<predicate>{ $predicate }</predicate>
@@ -396,7 +399,7 @@ declare private function gen-rel (
 	then gen-relrev-immediate ($node, $parent-node, $val, "rel", $base-uri, $prefix-map)
 	else (
 	   relrev-hanging ($node, $parent-node, $val, 'rel', $base-uri, $prefix-map),
-	   relrev-hanging-bnode($node, $val, 'rel', $base-uri, $prefix-map)
+	   relrev-hanging-bnode ($node, $val, 'rel', $base-uri, $prefix-map)
 
 	(:<triple>
 	<subject>bla</subject>
@@ -418,7 +421,8 @@ declare private function gen-rev (
 	then gen-relrev-immediate ($node, $parent-node, $val, "rev", $base-uri, $prefix-map)
 	else
 	(
-	   relrev-hanging ($node, $parent-node, $val, 'rev', $base-uri, $prefix-map)
+	   relrev-hanging ($node, $parent-node, $val, 'rev', $base-uri, $prefix-map),
+	   relrev-hanging-bnode ($node, $val, 'rev', $base-uri, $prefix-map)
 	)
 };
 
