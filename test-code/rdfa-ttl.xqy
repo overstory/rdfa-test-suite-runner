@@ -231,7 +231,7 @@ declare private function compact-uri (
 		let $local-part := fn:substring-after ($bare-uri, $ns-uri)
 
 		return
-		if ($prefix and fn:not (fn:contains ($local-part, ":")))
+		if ($prefix and $local-part and fn:not (fn:matches ($local-part, "[^\w\d\-_.]")))
 		then fn:concat ($prefix, ":", $local-part)
 		else $uri
 };
@@ -288,7 +288,7 @@ declare private function subject (
 			(:else if ($node/@typeof)
 			then wrap-uri (gen-blank-node-uri ($node)):)
 			else
-				if ($node/@typeof and $node/@about)     (: FixMe: Wouldn't be here if #node/@about is empty :)
+				if ($node/@typeof)
 				then gen-blank-node-uri($node)
 				else
 					if (fn:exists ($parent-node))
@@ -432,15 +432,16 @@ declare private function gen-rel (
 	if (has-resource ($node/@resource) or $node/@href)
 	then gen-relrev-immediate ($node, $parent-node, $val, "rel", $base-uri, $prefix-map)
 	else (
-	   relrev-hanging ($node, $parent-node, $val, 'rel', $base-uri, $prefix-map),
-	   relrev-hanging-bnode ($node, $val, 'rel', $base-uri, $prefix-map)
+		relrev-hanging ($node, $parent-node, $val, 'rel', $base-uri, $prefix-map),
+		relrev-hanging-bnode ($node, $val, 'rel', $base-uri, $prefix-map)
+	)
 
 	(:<triple>
 	<subject>bla</subject>
 	<predicate>bleh</predicate>
 	<object>blah</object>
 	</triple>:)
-	) (: (relrev-hanging ($node, $val, "rev", $base-uri), relrev-hanging-bnode ($node, $val, "rev", $base-uri)) :)
+	 (: (relrev-hanging ($node, $val, "rev", $base-uri), relrev-hanging-bnode ($node, $val, "rev", $base-uri)) :)
 };
 
 declare private function gen-rev (
@@ -549,7 +550,7 @@ declare function relrev-hanging (
 	then
 		<triple>
 			<subject>{ $subject }</subject>
-			<predicate>{ $rel-rev }</predicate>
+			<predicate>{ resolve-uri-or-curie ($rel-rev, $node, $base-uri, $prefix-map) }</predicate>
 			<object>{ $object }</object>
 		</triple>
 	else ()
@@ -574,7 +575,7 @@ declare function relrev-hanging-bnode(
 	then
 		<triple>
 			<subject>{ $subject }</subject>
-			<predicate>{ $rel-rev }</predicate>
+			<predicate>{ resolve-uri-or-curie ($rel-rev, $node, $base-uri, $prefix-map) }</predicate>
 			<object>{ $object }</object>
 		</triple>
 	else ()
@@ -713,18 +714,25 @@ declare private function resolve-curie (
 		then fn:substring-after (fn:substring-before ($val, "]"), "[")
 		else $val
 	let $prefix := if ($curie = $vocabulary-terms) then $curie else fn:substring-before ($curie, ":")
-	let $ns-uri := if (fn:not ($prefix) or (fn:starts-with ($curie, ":"))) then $dfvocab else namespace-uri-for-prefix ($prefix, $prefix-map, $node)
+	let $ns-uri :=
+		if (fn:not ($prefix) or (fn:starts-with ($curie, ":")))
+		then $dfvocab
+		else
+			if ($curie = $vocabulary-terms)
+			then map:get ($default-prefixes-map, $curie)
+			else namespace-uri-for-prefix ($prefix, $prefix-map, $node)
 	let $suffix := fn:substring-after ($curie, ":")
+	let $result :=
+		if ($prefix = "_")
+		then $curie
+		else if ($prefix = "" and fn:starts-with ($curie, ':'))
+		then fn:concat ("<", $dfvocab, $suffix, ">")
+		else
+			if ((($ns-uri eq $dfvocab) and ($suffix = $htmlrels)) or ($prefix and $ns-uri))
+			then fn:concat ("<", $ns-uri, $suffix, ">")
+			else ()
 
-	return
-	if ($prefix = "_")
-	then $curie
-	else if ($prefix = "" and fn:starts-with ($curie, ':'))
-	then fn:concat ("<", $dfvocab, $suffix, ">")
-	else
-		if ((($ns-uri eq $dfvocab) and ($suffix = $htmlrels)) or ($prefix and $ns-uri))
-		then fn:concat ("<", $ns-uri, $suffix, ">")
-		else ()
+	return $result
 };
 
 (:declare function ml:curie-parse($curie as xs:string, $context as element()) as xs:string* {
@@ -755,7 +763,10 @@ declare function resolve-uri (
 		else
 			if (fn:starts-with ($val, "#"))
 			then fn:concat ($base-uri, $val)
-			else fn:resolve-uri ($val, $base-uri)
+			else
+				if ($val = $vocabulary-terms)
+				then map:get ($default-prefixes-map, $val)
+				else fn:resolve-uri ($val, $base-uri)
 	return wrap-uri ($uri)
 };
 
