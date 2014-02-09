@@ -148,16 +148,17 @@ declare private function parse-rdfa (
 			,
 			parse-rdfa ($node/*, $node, $base-uri, $my-prefixes-map)
 		)
-	default return gen-error-triple ("rdfa:Error")
+	default return gen-error-triple (wrap-uri ($base-uri), "rdfa:Error")
 };
 
 declare private function gen-error-triple (
+	$subject as xs:string,
 	$object as xs:string
 ) as element(triple)
 {
 
 	<triple>
-		<subject>{ wrap-uri (map:get ($default-prefixes-map, "rdfa")) }</subject>
+		<subject>{ $subject }</subject>
 		<predicate>{ "rdf:type" }</predicate>
 		<object>{ $object }</object>
 	</triple>
@@ -409,16 +410,19 @@ declare private function gen-property (
 	if (fn:starts-with ($predicate, "_:"))
 	then ()
 	else
-	<triple>
-		<subject>{ $subject }</subject>
-		<predicate>{ $predicate }</predicate>
-		<object>{
-			$lang,
-			if ($datatype) then attribute rdf:datatype { $datatype } else (),
-			if ($parse-type) then attribute rdf:parseType { $parse-type } else (),
-			$object
-		}</object>
-	</triple>
+	if ($predicate)
+	then
+		<triple>
+			<subject>{ $subject }</subject>
+			<predicate>{ $predicate }</predicate>
+			<object>{
+				$lang,
+				if ($datatype) then attribute rdf:datatype { $datatype } else (),
+				if ($parse-type) then attribute rdf:parseType { $parse-type } else (),
+				$object
+			}</object>
+		</triple>
+	else gen-error-triple (wrap-uri ($base-uri), "rdfa:UnresolvedTerm")
 };
 
 declare private function gen-rel (
@@ -496,7 +500,6 @@ declare function hanging-descendants (
     $node//*[@src or has-about (@about) or @typeof or @href or has-resource (@resource)][count(($node//* intersect ./ancestor::*)/(@src | @about | @typeof | @href | @resource)) eq 0]
       (: but exclude stuff we've already seen, and stuff more than one level deep
          (the deeper stuff is "yet to be seen") :)
-
 };
 
 declare function hanging-bnode (
@@ -698,10 +701,6 @@ declare function effective-lang (
 };
 
 (: ----------------------------------------------------------------- :)
-(: ----------------------------------------------------------------- :)
-
-(: ----------------------------------------------------------------- :)
-(: ----------------------------------------------------------------- :)
 
 declare private function resolve-curie (
 	$val as xs:string,
@@ -734,23 +733,6 @@ declare private function resolve-curie (
 
 	return $result
 };
-
-(:declare function ml:curie-parse($curie as xs:string, $context as element()) as xs:string* {
-    let $prefix := substring-before($curie, ":")
-    let $nsuri  := if ($prefix eq "" or $prefix eq "[")
-    then (
-    $dfvocab
-    )
-    else ml:namespace-uri-for-prefix($prefix, $context)
-    let $suffix := if ($nsuri eq $dfvocab)
-                   then if (starts-with($curie, ":"))
-                        then substring-after($curie, ":")
-                        else if (starts-with($curie, "[:"))
-                        then substring-after($curie, "[:")
-                        else $curie
-                   else substring-after($curie, ":")
-    return ($prefix, $suffix, $nsuri)
-};:)
 
 declare function resolve-uri (
 	$val as xs:string,
@@ -791,9 +773,9 @@ declare function unwrap-uri (
 	$uri as xs:string
 ) as xs:string
 {
-    let $string-length as xs:int := fn:string-length ($uri) - 2
+	let $string-length as xs:int := fn:string-length ($uri) - 2
 
-    return fn:substring ($uri, 2, $string-length)
+	return fn:substring ($uri, 2, $string-length)
 };
 
 (: ----------------------------------------------------------------- :)
@@ -802,7 +784,7 @@ declare function gen-blank-node-uri (
 	$node as element()
 ) as xs:string
 {
-    concat("_:b", $node/fn:generate-id($node))
+    concat ("_:b", $node/fn:generate-id($node))
 };
 
 
