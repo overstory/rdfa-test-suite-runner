@@ -3,7 +3,7 @@ xquery version "1.0-ml";
 module namespace rdfa-ttl = "urn:overstory:rdf:rdf-ttl";
 
 (:
-	Current passing of the test suite: 46%
+	Current passing of the test suite: 89.7%
 :)
 
 declare namespace xsi="http://www.w3.org/2001/XMLSchema-instance";
