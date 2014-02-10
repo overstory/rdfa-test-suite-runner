@@ -262,6 +262,7 @@ declare private function triples-for-node (
 {
 	(: Function mapping is in play here, it prevents functions being called when the attribute is not present :)
 	(
+        gen-vocab ($node/@vocab/fn:normalize-space(.), $node, $base-uri, $prefix-map),	
 		gen-property ($node/@property/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
 		gen-rel ($node/@rel/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
 		gen-rev ($node/@rev/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
@@ -463,6 +464,23 @@ declare private function gen-rev (
 	   relrev-hanging ($node, $parent-node, $val, 'rev', $base-uri, $prefix-map),
 	   relrev-hanging-bnode ($node, $val, 'rev', $base-uri, $prefix-map)
 	)
+};
+
+declare private function gen-vocab (
+    $vocab as xs:string,
+    $node as element(),
+    $base-uri as xs:string,
+    $prefix-map as map:map
+) as element(triple)*
+{
+   if ( fn:not($vocab eq '') )
+   then 
+        <triple>
+            <subject>{ wrap-uri ( $base-uri ) }</subject>
+            <predicate>{string('rdfa:usesVocabulary')}</predicate>
+            <object>{ wrap-uri ( $vocab ) }</object>
+        </triple>
+   else ()
 };
 
 declare function gen-relrev-immediate (
