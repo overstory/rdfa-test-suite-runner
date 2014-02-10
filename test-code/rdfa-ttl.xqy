@@ -3,10 +3,7 @@ xquery version "1.0-ml";
 module namespace rdfa-ttl = "urn:overstory:rdf:rdf-ttl";
 
 (:
-	This is a still a wok in progress.  Many things are still missing or broken,
-	but it's a beginning of from-scratch RDFa -> Turtle parser.  It's currently
-	passing 46% of the test suite.
-
+	Current passing of the test suite: 46%
 :)
 
 declare namespace xsi="http://www.w3.org/2001/XMLSchema-instance";
@@ -105,7 +102,7 @@ declare function rdfa-to-ttl (
 	let $_ := map:clear ($referenced-prefixes)
 	let $prefix-map := context-prefix-map ($default-prefixes-map, $root/@prefix/fn:string())
 
-	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map)
+	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map )
 };
 
 (: ----------------------------------------------------------------- :)
@@ -287,29 +284,13 @@ declare private function subject (
 		else
 			if ($node/@src and ($node/@property) and (($node/@content or $node/@datatype)))
 			then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
-			(:else if ($node/@typeof)
-			then wrap-uri (gen-blank-node-uri ($node)):)
 			else
 				if ($node/@typeof)
 				then gen-blank-node-uri($node)
 				else
 					if (fn:exists ($parent-node))
-              				(:then subject ($parent-node, $parent-node/parent::*, $base-uri, $prefix-map):)
 					then subject-parent ($parent-node, $base-uri, $prefix-map)
 					else wrap-uri ($base-uri)
-
-
-     (:
-    if ($node/@about and fn:not($node/@about = ("_:", "[_:]")))
-    then resolve-uri-or-curie($node/@about, $node, $base-uri, $prefix-map)
-     else if ($node/@href and ($node/@property) and (($node/@content or $node/@datatype)))
-         then resolve-uri-or-curie($node/@href, $node, $base-uri, $prefix-map)
-         else if ($node/@src and ($node/@property) and (($node/@content or $node/@datatype)))
-            then resolve-uri-or-curie($node/@src, $node, $base-uri, $prefix-map)
-              else if ($node/@typeof and $node/@about)
-                   then wrap-uri (gen-blank-node-uri($node))
-                   else subject-parent($node/parent::*, $base-uri, $prefix-map)
-                   :)
 };
 
 declare private function subject-parent (
@@ -330,25 +311,7 @@ declare private function subject-parent (
                          then subject-parent($node/parent::*, $base-uri, $prefix-map)
                          else wrap-uri ($base-uri)
 
-
-    (:
-    if ($node/@resource[not(.='[]')])
-    then resolve-uri-or-curie($node/@resource, $node, $base-uri, $prefix-map)
-         else if ($node/(@rel | @rev))
-              then wrap-uri( gen-blank-node-uri($node) )
-              else if ( $node/@about[not(.='[]')] )
-                  then resolve-uri-or-curie( $node/@about, $node, $base-uri, $prefix-map )
-                        else if ( $node/@typeof )
-                             then wrap-uri( gen-blank-node-uri($node) )
-                             else if ( $node/parent::* )
-                                  then subject-parent( $node/parent::*, $base-uri, $prefix-map )
-                                  else wrap-uri ( $base-uri )
-      :)
-
 };
-
-
-
 
 declare private function object (
 	$node as element(),
@@ -358,25 +321,21 @@ declare private function object (
 ) as item()*
 {
 	if ($is-xml)
-	then ( $node/node())
-
-	(:
-	   else if ($node/@resource and not($node/@content) and not($node/@datatype))
-                   then resolve-uri-or-curie($node/@resource, $node, $base-uri, $prefix-map)
-                   else if ($node/@href and not($node/@content) and not($node/@datatype))
-                   then resolve-uri-or-curie($node/@href, $node, $base-uri, $prefix-map)
-                   else if ($node/@src and not($node/@content) and not($node/@datatype))
-                   then resolve-uri-or-curie($node/@src, $node, $base-uri, $prefix-map)
-                   else ()
-	:)
-
-	else
+	then ( $node/node() )
+    (:
+    removed, @typeof has nothing to do with object, the function is used in gen-property 
+    else
 		if ($node/@typeof and fn:not (has-about ($node/@about)))
 		then wrap-uri (gen-blank-node-uri ($node) )  (: CheckMe :)
-		else
-			if (has-resource ($node/@resource) and fn:not ($node/@rel) and fn:not ($node/@rev))
-			then resolve-uri-or-curie ($node/@resource, $node, $base-uri, $prefix-map)
-			else quoted-string (($node/@content, fn:string ($node), "")[1])
+    :)
+	else
+		if (has-resource ($node/@resource) and fn:not ($node/@rel) and fn:not ($node/@rev))
+		then resolve-uri-or-curie ($node/@resource, $node, $base-uri, $prefix-map)
+		else if (has-href ($node/@href) and fn:not ($node/@content) and fn:not ($node/@datatype))
+		then resolve-uri-or-curie ($node/@href, $node, $base-uri, $prefix-map)
+		else if (has-src ($node/@src) and fn:not ($node/@content) and fn:not ($node/@datatype))
+		then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
+		    else quoted-string (($node/@content, fn:string ($node), "")[1])
 };
 
 declare private function quoted-string (
@@ -399,7 +358,11 @@ declare private function gen-property (
 ) as element(triple)*
 {
 	for $prop in tokenize ($props, "\s+")
-	let $predicate := resolve-uri-or-curie ($prop, $node, $base-uri, $prefix-map)
+	let $vocab := ancestor-vocab ($node)
+	let $predicate := 
+	   if ( fn:not ( fn:contains($prop, ':') ) and ( $vocab != '' ) )
+	   then ( wrap-uri ( fn:concat ($vocab, $prop) ) )
+	   else ( resolve-uri-or-curie ($prop, $node, $base-uri, $prefix-map) ) 
 	let $is-xml as xs:boolean := is-xml ($node, $base-uri, $prefix-map)
 	let $datatype := if ($is-xml) then () else effective-datatype ($node, $prefix-map)
 	let $lang := effective-lang ($node, $parent-node)	(: ToDo: use ancestor-or-self:: instead? :)
@@ -440,13 +403,6 @@ declare private function gen-rel (
 		relrev-hanging ($node, $parent-node, $val, 'rel', $base-uri, $prefix-map),
 		relrev-hanging-bnode ($node, $val, 'rel', $base-uri, $prefix-map)
 	)
-
-	(:<triple>
-	<subject>bla</subject>
-	<predicate>bleh</predicate>
-	<object>blah</object>
-	</triple>:)
-	 (: (relrev-hanging ($node, $val, "rev", $base-uri), relrev-hanging-bnode ($node, $val, "rev", $base-uri)) :)
 };
 
 declare private function gen-rev (
@@ -503,11 +459,11 @@ declare function gen-relrev-immediate (
 	let $effective-obj := if ($relorrev eq "rel") then $locobj else $locsbj
 
 	return
-	<triple>
-		<subject>{ $effective-sbj }</subject>
-		<predicate>{ resolve-uri-or-curie ($relv, $node, $base-uri, $prefix-map) }</predicate>
-		<object>{ $effective-obj }</object>
-	</triple>
+       	<triple>
+       		<subject>{ $effective-sbj }</subject>
+       		<predicate>{ resolve-uri-or-curie ($relv, $node, $base-uri, $prefix-map) }</predicate>
+       		<object>{ $effective-obj }</object>
+       	</triple>
 };
 
 declare function hanging-descendants (
@@ -545,24 +501,19 @@ declare function relrev-hanging (
 	let $local-subject := subject($node, (), $base-uri, $prefix-map)
 	for $hang-desc in hanging-descendants($node)
 	let $local-object :=
-		(:
-		This needs to be handled somehow!
-		if ($hang-desc/@about[. = '[_:]'])
-		then ( wrap-uri(gen-blank-node-uri(@about/string())) )
-		   else :)
-		   if (has-about ($hang-desc/@about))
-		   then resolve-uri-or-curie ($hang-desc/@about, $hang-desc, $base-uri, $prefix-map)
-		   else if ($hang-desc/@src)
-			then resolve-uri-or-curie ($hang-desc/@src, $hang-desc, $base-uri, $prefix-map)
-			else if ($hang-desc/@typeof)
-			     then gen-blank-node-uri ($hang-desc)
-			     else if ($hang-desc/(@rel | @rev))
-				  then ()
-				  else if (has-resource ($hang-desc/@resource))
-				       then resolve-uri-or-curie ($hang-desc/@resource, $hang-desc, $base-uri, $prefix-map)
-				       else if ($hang-desc/@href)
-					    then resolve-uri-or-curie ($hang-desc/@href, $hang-desc, $base-uri, $prefix-map)
-					    else gen-blank-node-uri ($hang-desc)
+	   if (has-about ($hang-desc/@about))
+	   then resolve-uri-or-curie ($hang-desc/@about, $hang-desc, $base-uri, $prefix-map)
+	   else if ($hang-desc/@src)
+		then resolve-uri-or-curie ($hang-desc/@src, $hang-desc, $base-uri, $prefix-map)
+		else if ($hang-desc/@typeof)
+		     then gen-blank-node-uri ($hang-desc)
+		     else if ($hang-desc/(@rel | @rev))
+			  then ()
+			  else if (has-resource ($hang-desc/@resource))
+			       then resolve-uri-or-curie ($hang-desc/@resource, $hang-desc, $base-uri, $prefix-map)
+			       else if ($hang-desc/@href)
+				    then resolve-uri-or-curie ($hang-desc/@href, $hang-desc, $base-uri, $prefix-map)
+				    else gen-blank-node-uri ($hang-desc)
 	let $subject := if ($relorrev eq "rel") then $local-subject else $local-object
 	let $object := if ($relorrev eq "rel") then $local-object else $local-subject
 
@@ -613,7 +564,6 @@ declare private function gen-typeof (
 ) as element(triple)*
 {
 	for $type in tokenize ($props, "\s+")
-	(:let $subject := subject ($node, $parent-node, $base-uri, $prefix-map):)
 	(: todo: make function subject-typeof :)
 	let $local-subject :=
 	           if (has-about ($node/@about))
@@ -627,14 +577,18 @@ declare private function gen-typeof (
                                   else if ($node/@href and not($node/(@rel | @rev)))
                                        then resolve-uri-or-curie($node/@href, $node, $base-uri, $prefix-map)
                                        else gen-blank-node-uri($node)
-
-	let $rsc := resolve-uri-or-curie ($type, $node, $base-uri, $prefix-map)
-
+    
+    let $vocab := ancestor-vocab ($node)
+	let $object := 
+	   if ( fn:not ( fn:contains($type, ':') ) and ( $vocab != '' ) )
+	   then ( wrap-uri ( fn:concat ($vocab, $type) ) )
+	   else ( resolve-uri-or-curie ($type, $node, $base-uri, $prefix-map) ) 
+ 
 	return
 	<triple>
 		<subject>{ $local-subject }</subject>
 		<predicate>rdf:type</predicate>
-		<object>{ $rsc }</object>
+		<object>{ $object }</object>
 	</triple>
 };
 
@@ -815,6 +769,14 @@ declare private function is-xml (
 	$node/@datatype and (unwrap-uri (resolve-curie ($node/@datatype, $node, $prefix-map)) = $rdf-XMLLiteral)
 };
 
+(: returns first ancestor @vocab :)
+declare private function ancestor-vocab (
+    $node as element()
+) as xs:string*
+{
+    $node/ancestor-or-self::*[@vocab][1]/@vocab
+};
+
 (: function mapping will cause empty sequence result if $about is empty, which evaluates as false :)
 declare private function has-about (
 	$about as xs:string
@@ -829,6 +791,20 @@ declare private function has-resource (
 ) as xs:boolean
 {
 	fn:not ($resource = ("[]"))
+};
+
+declare private function has-href (
+	$href as xs:string
+) as xs:boolean
+{
+	fn:not ($href = ("[]"))
+};
+
+declare private function has-src (
+	$src as xs:string
+) as xs:boolean
+{
+	fn:not ($src = ("[]"))
 };
 
 (: ----------------------------------------------------------------- :)
