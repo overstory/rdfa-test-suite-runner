@@ -3,7 +3,7 @@ xquery version "1.0-ml";
 module namespace rdfa-ttl = "urn:overstory:rdf:rdf-ttl";
 
 (:
-	Current passing of the test suite: 89.7%
+	Current passing of the test suite: 90.5%
 :)
 
 declare namespace xsi="http://www.w3.org/2001/XMLSchema-instance";
@@ -253,17 +253,24 @@ declare private function find-prefix-for (
 declare private function triples-for-node (
 	$node as element(),
 	$parent-node as element()?,
-	$base-uri as xs:string,
+	$root-base-uri as xs:string,
 	$prefix-map as map:map
 ) as element(triple)*
 {
 	(: Function mapping is in play here, it prevents functions being called when the attribute is not present :)
 	(
-        gen-vocab ($node/@vocab/fn:normalize-space(.), $node, $base-uri, $prefix-map),	
-		gen-property ($node/@property/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-		gen-rel ($node/@rel/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-		gen-rev ($node/@rev/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-		gen-typeof ($node/@typeof/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map)
+	   let $base-uri :=
+            if ($node/self::*[@xml:base]/string(@xml:base) or $node/ancestor::*[@xml:base]/string(@xml:base))
+            then ($node/self::*[@xml:base]/string(@xml:base), $node/ancestor::*[@xml:base]/string(@xml:base))[1]
+            else ($root-base-uri)
+       return
+       (
+       gen-vocab ($node/@vocab/fn:normalize-space(.), $node, $base-uri, $prefix-map),	
+	   gen-property ($node/@property/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
+	   gen-rel ($node/@rel/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
+	   gen-rev ($node/@rev/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
+	   gen-typeof ($node/@typeof/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map)
+	   )
 	)
 };
 
@@ -755,8 +762,8 @@ declare function unwrap-uri (
 declare function gen-blank-node-uri (
 	$node as element()
 ) as xs:string
-{
-    concat ("_:b", $node/fn:generate-id($node))
+{   
+   concat ("_:b", $node/fn:generate-id($node))
 };
 
 
