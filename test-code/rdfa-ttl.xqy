@@ -3,7 +3,7 @@ xquery version "1.0-ml";
 module namespace rdfa-ttl = "urn:overstory:rdf:rdf-ttl";
 
 (:
-	Current passing of the test suite: 90.5%
+	Current passing percentage of the test suite: 91.3%
 :)
 
 declare namespace xsi="http://www.w3.org/2001/XMLSchema-instance";
@@ -404,7 +404,7 @@ declare private function gen-rel (
 	$prefix-map as map:map
 ) as element(triple)*
 {
-	if (has-resource ($node/@resource) or $node/@href)
+	if (has-resource ($node/@resource) or has-href ($node/@href) or has-src ($node/@src) )
 	then gen-relrev-immediate ($node, $parent-node, $val, "rel", $base-uri, $prefix-map)
 	else (
 		relrev-hanging ($node, $parent-node, $val, 'rel', $base-uri, $prefix-map),
@@ -420,7 +420,7 @@ declare private function gen-rev (
 	$prefix-map as map:map
 ) as element(triple)*
 {
-	if (has-resource ($node/@resource) or $node/@href)
+	if (has-resource ($node/@resource) or has-href ($node/@href) or has-src ($node/@src) )
 	then gen-relrev-immediate ($node, $parent-node, $val, "rev", $base-uri, $prefix-map)
 	else
 	(
@@ -460,7 +460,11 @@ declare function gen-relrev-immediate (
 	let $locobj :=
 		if (has-resource ($node/@resource))
 		then resolve-uri-or-curie ($node/@resource, $node, $base-uri, $prefix-map)
-		else resolve-uri ($node/@href, $base-uri)
+		else if (has-resource ($node/@href))
+		then resolve-uri-or-curie ($node/@href, $node, $base-uri, $prefix-map)
+		else if (has-resource ($node/@src))
+		then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)		
+		   else resolve-uri ($node/@href, $base-uri)
 	let $locsbj := subject ($node, $parent-node, $base-uri, $prefix-map)
 	let $effective-sbj := if ($relorrev eq "rel") then $locsbj else $locobj
 	let $effective-obj := if ($relorrev eq "rel") then $locobj else $locsbj
