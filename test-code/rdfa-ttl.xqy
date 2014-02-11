@@ -273,53 +273,11 @@ declare private function triples-for-node (
             else ($root-base-uri)
        return
        (
-       (: 
-       todo: this is a temp solution, this is still not entirely correct
-       only subjects without curie should not be processed! 
-       
-       <root>
-        <head>
-          <title>Test 0318</title>
-        </head>
-        <body>
-          <div vocab="http://xmlns.com/foaf/0.1/">
-            <div about="#me">
-              <p property="name">Ivan Herman</p>
-              <meta vocab="" property="foaf:prop" content="value"/>
-            </div>
-          </div>
-        </body>
-      </root>
-      
-      foaf:prop should display
-      
-      <root>
-        <head>
-          <title>Test 0318</title>
-        </head>
-        <body>
-          <div vocab="http://xmlns.com/foaf/0.1/">
-            <div about="#me">
-              <p property="name">Ivan Herman</p>
-              <meta vocab="" property="prop" content="value"/>
-            </div>
-          </div>
-        </body>
-      </root>
-      
-      prop should be ignored
-       
-       :)
-	   if ($node/ancestor-or-self::*/@vocab = '') then ()
-	   else
-	   (
 	       gen-vocab ($node/@vocab/fn:normalize-space(.), $node, $base-uri, $prefix-map),
 	       gen-property ($node/@property/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
     	   gen-rel ($node/@rel/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
     	   gen-rev ($node/@rev/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
     	   gen-typeof ($node/@typeof/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map)
-	   )
-	   
 	   )
 	)
 };
@@ -422,9 +380,43 @@ declare private function gen-property (
 	let $parse-type := if ($is-xml) then "Literal" else ()
 	let $subject := subject ($node, $parent-node, $base-uri, $prefix-map)
 	let $object := object ($node, $is-xml, $base-uri, $prefix-map)
-
 	return
 	if (fn:starts-with ($predicate, "_:"))
+	then ()
+	(: subjects without curies should not be processed if @vocab=''
+       <root>
+        <head>
+          <title>Test 0318</title>
+        </head>
+        <body>
+          <div vocab="http://xmlns.com/foaf/0.1/">
+            <div about="#me">
+              <p property="name">Ivan Herman</p>
+              <meta vocab="" property="foaf:prop" content="value"/>
+            </div>
+          </div>
+        </body>
+      </root>
+      
+      foaf:prop should display
+      
+      <root>
+        <head>
+          <title>Test 0318</title>
+        </head>
+        <body>
+          <div vocab="http://xmlns.com/foaf/0.1/">
+            <div about="#me">
+              <p property="name">Ivan Herman</p>
+              <meta vocab="" property="prop" content="value"/>
+            </div>
+          </div>
+        </body>
+      </root>
+      
+      prop should be ignored
+    :)
+	else if ( $vocab = '' and not(contains($prop, ':')) )
 	then ()
 	else
 	if ($predicate)
