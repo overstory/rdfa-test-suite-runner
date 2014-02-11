@@ -292,7 +292,7 @@ declare private function subject (
 			if ($node/@src and ($node/@property) and (($node/@content or $node/@datatype)))
 			then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
 			else
-				if ($node/@typeof)
+				if ($node/@typeof and not(has-about($node/ancestor::*)))
 				then gen-blank-node-uri($node)
 				else
 					if (fn:exists ($parent-node))
@@ -795,6 +795,8 @@ declare private function has-about (
 {
 	fn:not ($about = ("_:", "[_:]", "[]"))
 };
+
+
 
 (: function mapping will cause empty sequence result if $about is empty, which evaluates as false :)
 declare private function has-resource (
