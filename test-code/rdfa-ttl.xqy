@@ -3,7 +3,7 @@ xquery version "1.0-ml";
 module namespace rdfa-ttl = "urn:overstory:rdf:rdf-ttl";
 
 (:
-	Current passing percentage of the test suite: 95.2%
+	Current passing percentage of the test suite: 96.8%
 :)
 
 declare namespace xsi="http://www.w3.org/2001/XMLSchema-instance";
@@ -259,17 +259,67 @@ declare private function triples-for-node (
 {
 	(: Function mapping is in play here, it prevents functions being called when the attribute is not present :)
 	(
+	   (: 
+	   xml:base rules:
+	   1. If node has an ancestor-or-self that have a @xml:base set to blank then the base-uri is restarted to the root-base-uri (either default or specified by the user)
+	   2. If node has an ancestor-or-self that have a @xml:base set then that base-uri is used
+	   3. Otherwise if 1 and 2 is false then root-baseuri is used as base-uri
+	   :)
 	   let $base-uri :=
-            if ($node/self::*[@xml:base]/string(@xml:base) or $node/ancestor::*[@xml:base]/string(@xml:base))
+	        if ($node/ancestor::*[@xml:base = ''])
+	        then ($root-base-uri)
+            else if ($node/self::*[@xml:base]/string(@xml:base) or $node/ancestor::*[@xml:base]/string(@xml:base))
             then ($node/self::*[@xml:base]/string(@xml:base), $node/ancestor::*[@xml:base]/string(@xml:base))[1]
             else ($root-base-uri)
        return
        (
-       gen-vocab ($node/@vocab/fn:normalize-space(.), $node, $base-uri, $prefix-map),	
-	   gen-property ($node/@property/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-	   gen-rel ($node/@rel/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-	   gen-rev ($node/@rev/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-	   gen-typeof ($node/@typeof/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map)
+       (: 
+       todo: this is a temp solution, this is still not entirely correct
+       only subjects without curie should not be processed! 
+       
+       <root>
+        <head>
+          <title>Test 0318</title>
+        </head>
+        <body>
+          <div vocab="http://xmlns.com/foaf/0.1/">
+            <div about="#me">
+              <p property="name">Ivan Herman</p>
+              <meta vocab="" property="foaf:prop" content="value"/>
+            </div>
+          </div>
+        </body>
+      </root>
+      
+      foaf:prop should display
+      
+      <root>
+        <head>
+          <title>Test 0318</title>
+        </head>
+        <body>
+          <div vocab="http://xmlns.com/foaf/0.1/">
+            <div about="#me">
+              <p property="name">Ivan Herman</p>
+              <meta vocab="" property="prop" content="value"/>
+            </div>
+          </div>
+        </body>
+      </root>
+      
+      prop should be ignored
+       
+       :)
+	   if ($node/ancestor-or-self::*/@vocab = '') then ()
+	   else
+	   (
+	       gen-vocab ($node/@vocab/fn:normalize-space(.), $node, $base-uri, $prefix-map),
+	       gen-property ($node/@property/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
+    	   gen-rel ($node/@rel/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
+    	   gen-rev ($node/@rev/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
+    	   gen-typeof ($node/@typeof/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map)
+	   )
+	   
 	   )
 	)
 };
@@ -329,20 +379,16 @@ declare private function object (
 {
 	if ($is-xml)
 	then ( $node/node() )
-    (:
-    removed, @typeof has nothing to do with object, the function is used in gen-property 
-    else
-		if ($node/@typeof and fn:not (has-about ($node/@about)))
-		then wrap-uri (gen-blank-node-uri ($node) )  (: CheckMe :)
-    :)
-	else
-		if (has-resource ($node/@resource) and fn:not ($node/@rel) and fn:not ($node/@rev))
-		then resolve-uri-or-curie ($node/@resource, $node, $base-uri, $prefix-map)
-		else if (has-href ($node/@href) and fn:not ($node/@content) and fn:not ($node/@datatype))
-		then resolve-uri-or-curie ($node/@href, $node, $base-uri, $prefix-map)
-		else if (has-src ($node/@src) and fn:not ($node/@content) and fn:not ($node/@datatype))
-		then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
-		    else quoted-string (($node/@content, fn:string ($node), "")[1])
+	else if (has-resource ($node/@resource) and fn:not ($node/@rel) and fn:not ($node/@rev))
+	then resolve-uri-or-curie ($node/@resource, $node, $base-uri, $prefix-map)
+	else if (has-href ($node/@href) and fn:not ($node/@content) and fn:not ($node/@datatype))
+	then resolve-uri-or-curie ($node/@href, $node, $base-uri, $prefix-map)
+	else if (has-src ($node/@src) and fn:not ($node/@content) and fn:not ($node/@datatype))
+	then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
+	(: unless @about is '[]' the new object is set if @typeof is present :)
+	else if ($node/@typeof and (fn:not (has-about ($node/@about)) and fn:not($node/@about='[]')))
+	then gen-blank-node-uri ($node)
+	   else quoted-string (($node/@content, fn:string ($node), "")[1])
 };
 
 declare private function quoted-string (
