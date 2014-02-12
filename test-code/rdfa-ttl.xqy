@@ -661,7 +661,7 @@ declare function map-from-prefixes (
         let $_ :=
                 for $token at $idx in $tokens
                 return
-                if ((($idx mod 2) = 1) and ($token ne "_:"))
+                if ((($idx mod 2) = 1) and ($token ne "_:") and fn:ends-with ($token, ":") and (fn:substring-before ($token, ":") castable as xs:NCName))
                 then map:put ($map, fn:substring-before ($token, ":"), $tokens[$idx + 1])
                 else ()
         let $_ :=
