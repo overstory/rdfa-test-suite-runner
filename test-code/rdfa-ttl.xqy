@@ -94,17 +94,19 @@ declare function rdfa-to-ttl (
 ) as xs:string?
 {
 	let $root := if ($doc-node instance of document-node()) then $doc-node/* else $doc-node
-	let $base-uri := ($root/xhtml:head/xhtml:base/@href, $root/@xml:base, $uri, $default-base-uri)[1]
+	let $origin-uri := $uri
+	let $base-uri := ($root/xhtml:head/xhtml:base/@href, $root/head/base/@href, $root/@xml:base, $uri, $default-base-uri)[1]
 	let $_ := map:clear ($referenced-prefixes)
 	let $prefix-map := context-prefix-map ($default-prefixes-map, $root/@prefix/fn:string())
 
-	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $prefix-map )
+	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $origin-uri, $prefix-map )
 };
 
 (: ----------------------------------------------------------------- :)
 
 declare private function render-ttl (
 	$triples as element(triple)*,
+	$origin-uri as xs:string?,
 	$prefix-map as map:map
 ) as xs:string?
 {
@@ -117,7 +119,7 @@ declare private function render-ttl (
 
 	fn:string-join (
 		(
-			emit-prefixes ($referenced-prefixes), "",
+			emit-prefixes ($origin-uri, $referenced-prefixes), "",
 
 			for $triple in $triples
 			return emit-triple ($triple)
@@ -160,6 +162,7 @@ declare private function gen-error-triple (
 (: ----------------------------------------------------------------- :)
 
 declare private function emit-prefixes (
+    $origin-uri as xs:string?,
 	$prefix-map as map:map
 ) as xs:string*
 {
@@ -168,7 +171,21 @@ declare private function emit-prefixes (
 			for $key in map:keys ($minimal-prefixes)
 			return if (map:get ($prefix-map, $key)) then () else map:put ($prefix-map, $key, map:get ($minimal-prefixes, $key))
 		for $prefix in map:keys ($prefix-map)
-		let $ns-uri := map:get ($prefix-map, $prefix)
+		let $ns-uri-from-map := map:get ($prefix-map, $prefix)
+		let $ns-uri :=
+		      if (fn:not(fn:starts-with($ns-uri-from-map,'http:') or fn:starts-with($ns-uri-from-map, 'uri')))
+		      then 
+		          (:
+		          # Checks to see that prefixes with relative IRIs are not resolved to the document base
+                  # It is resolved against the document origin, though, when the result is parsed
+                  :)
+		          (
+		          if ( fn:not ( fn:ends-with($origin-uri, '/') ) )
+		          then ( fn:concat($origin-uri, '/', $ns-uri-from-map) )
+		          else ( fn:concat($origin-uri, $ns-uri-from-map) )
+		          )
+		      else $ns-uri-from-map
+
 		order by $prefix
 		return fn:concat ("@prefix ", $prefix, ": ", wrap-uri ($ns-uri), " .")
 	)
@@ -542,19 +559,22 @@ declare function relrev-hanging (
 	let $local-subject := subject($node, (), $base-uri, $prefix-map)
 	for $hang-desc in hanging-descendants($node)
 	let $local-object :=
-	   if (has-about ($hang-desc/@about))
-	   then resolve-uri-or-curie ($hang-desc/@about, $hang-desc, $base-uri, $prefix-map)
-	   else if ($hang-desc/@src)
-		then resolve-uri-or-curie ($hang-desc/@src, $hang-desc, $base-uri, $prefix-map)
-		else if ($hang-desc/@typeof)
-		     then gen-blank-node-uri ($hang-desc)
-		     else if ($hang-desc/(@rel | @rev))
-			  then ()
-			  else if (has-resource ($hang-desc/@resource))
-			       then resolve-uri-or-curie ($hang-desc/@resource, $hang-desc, $base-uri, $prefix-map)
-			       else if ($hang-desc/@href)
-				    then resolve-uri-or-curie ($hang-desc/@href, $hang-desc, $base-uri, $prefix-map)
-				    else gen-blank-node-uri ($hang-desc)
+            if ($hang-desc/@about[fn:starts-with(., '[_:')])
+            then ()
+            else if (has-about ($hang-desc/@about))
+            then resolve-uri-or-curie ($hang-desc/@about, $hang-desc, $base-uri, $prefix-map)
+            else if ($hang-desc/@src)
+            then resolve-uri-or-curie ($hang-desc/@src, $hang-desc, $base-uri, $prefix-map)
+            else if ($hang-desc/@typeof)
+            then gen-blank-node-uri ($hang-desc)
+            else if ($hang-desc/(@rel | @rev))
+            then ()
+            else if (has-resource ($hang-desc/@resource))
+            then resolve-uri-or-curie ($hang-desc/@resource, $hang-desc, $base-uri, $prefix-map)
+            else if ($hang-desc/@href)
+            then resolve-uri-or-curie ($hang-desc/@href, $hang-desc, $base-uri, $prefix-map)
+            
+                else gen-blank-node-uri ($hang-desc)
 	let $subject := if ($relorrev eq "rel") then $local-subject else $local-object
 	let $object := if ($relorrev eq "rel") then $local-object else $local-subject
 
@@ -673,14 +693,23 @@ declare function map-from-prefixes (
 
 declare private function namespace-uri-for-prefix (
         $prefix as xs:string,
-	$prefix-map as map:map,
-        $node as node()
+	    $prefix-map as map:map,
+        $node as node(),
+        $base-uri as xs:string?
 ) as xs:string?
 {
         let $uri as xs:string? := map:get ($prefix-map, $prefix)
         let $uri as xs:string? := if (fn:exists ($uri)) then $uri else map:get ($default-prefixes-map, $prefix)
         let $uri as xs:string? := if (fn:exists ($uri) or ($prefix = "_")) then $uri else fn:namespace-uri-for-prefix ($prefix, $node)
-	let $_ := if (fn:exists ($uri)) then map:put ($referenced-prefixes, $prefix, $uri) else ()
+        (:
+        needs something like this, however better to add this when prefix map is generated.
+        let $test as xs:string? := 
+            if (fn:exists ($uri) and not(fn:starts-with($uri, 'http') or fn:starts-with($uri, 'uri'))) 
+            then 
+            concat($base-uri, $uri) 
+            else $uri
+            :)
+	    let $_ := if (fn:exists ($uri)) then map:put ($referenced-prefixes, $prefix, $uri) else ()
 
         return $uri
 };
@@ -693,9 +722,9 @@ declare function effective-datatype (
 ) as xs:string?
 {
 	if ($node/@datatype)
-	then ( resolve-curie ($node/@datatype, $node, $prefix-map) )
+	then ( resolve-curie ($node/@datatype, $node, (), $prefix-map) )
 	else if ($node/@rdf:datatype)
-	then ( resolve-curie ($node/@rdf:datatype, $node, $prefix-map) )
+	then ( resolve-curie ($node/@rdf:datatype, $node, (), $prefix-map) )
 	else ()
 
 };
@@ -721,6 +750,7 @@ declare private variable $default-bnode-id := "_:defbnode";
 declare private function resolve-curie (
 	$val as xs:string,
 	$node as element(),
+	$base-uri as xs:string?,
 	$prefix-map as map:map
 ) as xs:string?
 {
@@ -735,7 +765,7 @@ declare private function resolve-curie (
 		else
 			if ($curie = $vocabulary-terms)
 			then map:get ($default-prefixes-map, $curie)
-			else namespace-uri-for-prefix ($prefix, $prefix-map, $node)
+			else namespace-uri-for-prefix ($prefix, $prefix-map, $node, $base-uri)
 	let $suffix := fn:substring-after ($curie, ":")
 	let $result :=
 		if ($prefix = "_")
@@ -743,8 +773,10 @@ declare private function resolve-curie (
 		else if ($prefix = "" and fn:starts-with ($curie, ':'))
 		then fn:concat ("<", $dfvocab, $suffix, ">")
 		else
-			if ((($ns-uri eq $dfvocab) and ($suffix = $htmlrels)) or ($prefix and $ns-uri))
+		    
+		    if ((($ns-uri eq $dfvocab) and ($suffix = $htmlrels)) or ($prefix and $ns-uri))
 			then fn:concat ("<", $ns-uri, $suffix, ">")
+			
 			else ()
 
 	return $result
@@ -775,7 +807,7 @@ declare private function resolve-uri-or-curie (
 	$prefix-map as map:map
 ) as xs:string
 {
-	(resolve-curie ($val, $node, $prefix-map), resolve-uri ($val, $base-uri))[1]
+	(resolve-curie ($val, $node, $base-uri, $prefix-map), resolve-uri ($val, $base-uri))[1]
 };
 
 declare function wrap-uri (
@@ -810,7 +842,7 @@ declare private function is-xml (
 	$prefix-map as map:map
 ) as xs:boolean
 {
-	$node/@datatype and (unwrap-uri (resolve-curie ($node/@datatype, $node, $prefix-map)) = $rdf-XMLLiteral)
+	$node/@datatype and (unwrap-uri (resolve-curie ($node/@datatype, $node, (), $prefix-map)) = $rdf-XMLLiteral)
 };
 
 (: returns first ancestor @vocab :)
