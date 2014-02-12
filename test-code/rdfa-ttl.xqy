@@ -2,10 +2,6 @@ xquery version "1.0-ml";
 
 module namespace rdfa-ttl = "urn:overstory:rdf:rdf-ttl";
 
-(:
-	Current passing percentage of the test suite: 96.8%
-:)
-
 declare namespace xsi="http://www.w3.org/2001/XMLSchema-instance";
 declare namespace xhtml = "http://www.w3.org/1999/xhtml";
 declare namespace rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#";
@@ -87,7 +83,7 @@ declare private variable $referenced-prefixes := map:map();
 
 declare function rdfa-to-ttl (
         $doc as node()
-) (: as xs:string :)
+) as xs:string?
 {
 	rdfa-to-ttl ($doc, ())
 };
@@ -95,7 +91,7 @@ declare function rdfa-to-ttl (
 declare function rdfa-to-ttl (
         $doc-node as node(),
         $uri as xs:string?
-) (: as xs:string :)
+) as xs:string?
 {
 	let $root := if ($doc-node instance of document-node()) then $doc-node/* else $doc-node
 	let $base-uri := ($root/xhtml:head/xhtml:base/@href, $root/@xml:base, $uri, $default-base-uri)[1]
@@ -110,7 +106,7 @@ declare function rdfa-to-ttl (
 declare private function render-ttl (
 	$triples as element(triple)*,
 	$prefix-map as map:map
-) (: as xs:string :)
+) as xs:string?
 {
 	(:
 	 emit prefixes
@@ -257,28 +253,26 @@ declare private function triples-for-node (
 	$prefix-map as map:map
 ) as element(triple)*
 {
-	(: Function mapping is in play here, it prevents functions being called when the attribute is not present :)
-	(
-	   (: 
-	   xml:base rules:
-	   1. If node has an ancestor-or-self that have a @xml:base set to blank then the base-uri is restarted to the root-base-uri (either default or specified by the user)
-	   2. If node has an ancestor-or-self that have a @xml:base set then that base-uri is used
-	   3. Otherwise if 1 and 2 is false then root-baseuri is used as base-uri
-	   :)
-	   let $base-uri :=
-	        if ($node/ancestor::*[@xml:base = ''])
-	        then ($root-base-uri)
-            else if ($node/self::*[@xml:base]/string(@xml:base) or $node/ancestor::*[@xml:base]/string(@xml:base))
-            then ($node/self::*[@xml:base]/string(@xml:base), $node/ancestor::*[@xml:base]/string(@xml:base))[1]
-            else ($root-base-uri)
-       return
-       (
-	       gen-vocab ($node/@vocab/fn:normalize-space(.), $node, $base-uri, $prefix-map),
-	       gen-property ($node/@property/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-    	   gen-rel ($node/@rel/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-    	   gen-rev ($node/@rev/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-    	   gen-typeof ($node/@typeof/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map)
-	   )
+	(:
+	CheckMe: Is this correct for recursive calls?  Is $root-base-uri the closest in-scope, or the doc root setting?
+		xml:base rules:
+		1. If node has an ancestor-or-self that have a @xml:base set to blank then the base-uri is restarted to the root-base-uri (either default or specified by the user)
+		2. If node has an ancestor-or-self that have a @xml:base set then that base-uri is used
+		3. Otherwise if 1 and 2 is false then root-baseuri is used as base-uri
+	:)
+	let $base-uri :=
+		if ($node/ancestor::*[@xml:base = ''])
+		then ($root-base-uri)
+		else if ($node/self::*[@xml:base]/string(@xml:base) or $node/ancestor::*[@xml:base]/string(@xml:base))
+		then ($node/self::*[@xml:base]/string(@xml:base), $node/ancestor::*[@xml:base]/string(@xml:base))[1]
+		else ($root-base-uri)
+	return (
+		(: Function mapping is in play here, it prevents functions being called when the attribute is not present :)
+		gen-vocab ($node/@vocab/fn:normalize-space(.), $node, $base-uri, $prefix-map),
+		gen-property ($node/@property/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
+		gen-rel ($node/@rel/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
+		gen-rev ($node/@rev/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
+		gen-typeof ($node/@typeof/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map)
 	)
 };
 
@@ -287,10 +281,8 @@ declare private function subject (
 	$parent-node as element()?,
 	$base-uri as xs:string,
 	$prefix-map as map:map
-) as xs:string? (: xs:anyURI :)
+) as xs:string?
 {
-	(: todo: why ignore [_:] ?? :)
-	(: if ($node/@about and fn:not ($node/@about = ("_:", "[_:]"))) :)
 	if (has-about ($node/@about))
 	then resolve-uri-or-curie ($node/@about, $node, $base-uri, $prefix-map)
 	else
@@ -344,9 +336,9 @@ declare private function object (
 	else if (has-src ($node/@src) and fn:not ($node/@content) and fn:not ($node/@datatype))
 	then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
 	(: unless @about is '[]' the new object is set if @typeof is present :)
-	else if ($node/@typeof and (fn:not (has-about ($node/@about)) and fn:not($node/@about='[]')))
+	else if ($node/@typeof and (fn:not (has-about ($node/@about)) and has-about ($node/@about)))
 	then gen-blank-node-uri ($node)
-	   else quoted-string (($node/@content, fn:string ($node), "")[1])
+	else quoted-string (($node/@content, fn:string ($node), "")[1])
 };
 
 declare private function quoted-string (
@@ -370,10 +362,10 @@ declare private function gen-property (
 {
 	for $prop in tokenize ($props, "\s+")
 	let $vocab := ancestor-vocab ($node)
-	let $predicate := 
+	let $predicate :=
 	   if ( fn:not ( fn:contains($prop, ':') ) and ( $vocab != '' ) )
 	   then ( wrap-uri ( fn:concat ($vocab, $prop) ) )
-	   else ( resolve-uri-or-curie ($prop, $node, $base-uri, $prefix-map) ) 
+	   else ( resolve-uri-or-curie ($prop, $node, $base-uri, $prefix-map) )
 	let $is-xml as xs:boolean := is-xml ($node, $base-uri, $prefix-map)
 	let $datatype := if ($is-xml) then () else effective-datatype ($node, $prefix-map)
 	let $lang := effective-lang ($node, $parent-node)	(: ToDo: use ancestor-or-self:: instead? :)
@@ -397,9 +389,9 @@ declare private function gen-property (
           </div>
         </body>
       </root>
-      
+
       foaf:prop should display
-      
+
       <root>
         <head>
           <title>Test 0318</title>
@@ -413,7 +405,7 @@ declare private function gen-property (
           </div>
         </body>
       </root>
-      
+
       prop should be ignored
     :)
 	else if ( $vocab = '' and not(contains($prop, ':')) )
@@ -475,7 +467,7 @@ declare private function gen-vocab (
 ) as element(triple)*
 {
    if ( fn:not($vocab eq '') )
-   then 
+   then
         <triple>
             <subject>{ wrap-uri ( $base-uri ) }</subject>
             <predicate>{string('rdfa:usesVocabulary')}</predicate>
@@ -501,7 +493,7 @@ declare function gen-relrev-immediate (
 		else if (has-resource ($node/@href))
 		then resolve-uri-or-curie ($node/@href, $node, $base-uri, $prefix-map)
 		else if (has-resource ($node/@src))
-		then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)		
+		then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
 		   else resolve-uri ($node/@href, $base-uri)
 	let $locsbj := subject ($node, $parent-node, $base-uri, $prefix-map)
 	let $effective-sbj := if ($relorrev eq "rel") then $locsbj else $locobj
@@ -626,13 +618,13 @@ declare private function gen-typeof (
                                   else if ($node/@href and not($node/(@rel | @rev)))
                                        then resolve-uri-or-curie($node/@href, $node, $base-uri, $prefix-map)
                                        else gen-blank-node-uri($node)
-    
+
     let $vocab := ancestor-vocab ($node)
-	let $object := 
+	let $object :=
 	   if ( fn:not ( fn:contains($type, ':') ) and ( $vocab != '' ) )
 	   then ( wrap-uri ( fn:concat ($vocab, $type) ) )
-	   else ( resolve-uri-or-curie ($type, $node, $base-uri, $prefix-map) ) 
- 
+	   else ( resolve-uri-or-curie ($type, $node, $base-uri, $prefix-map) )
+
 	return
 	<triple>
 		<subject>{ $local-subject }</subject>
@@ -723,6 +715,9 @@ declare function effective-lang (
 
 (: ----------------------------------------------------------------- :)
 
+declare private variable $default-bnode-ref := "_:";
+declare private variable $default-bnode-id := "_:defbnode";
+
 declare private function resolve-curie (
 	$val as xs:string,
 	$node as element(),
@@ -744,7 +739,7 @@ declare private function resolve-curie (
 	let $suffix := fn:substring-after ($curie, ":")
 	let $result :=
 		if ($prefix = "_")
-		then $curie
+		then if ($curie = $default-bnode-ref) then $default-bnode-id else $curie
 		else if ($prefix = "" and fn:starts-with ($curie, ':'))
 		then fn:concat ("<", $dfvocab, $suffix, ">")
 		else
@@ -804,7 +799,7 @@ declare function unwrap-uri (
 declare function gen-blank-node-uri (
 	$node as element()
 ) as xs:string
-{   
+{
    concat ("_:b", $node/fn:generate-id($node))
 };
 
@@ -831,10 +826,8 @@ declare private function has-about (
 	$about as xs:string
 ) as xs:boolean
 {
-	fn:not ($about = ("_:", "[_:]", "[]"))
+	fn:not ($about = ("[]"))
 };
-
-
 
 (: function mapping will cause empty sequence result if $about is empty, which evaluates as false :)
 declare private function has-resource (
