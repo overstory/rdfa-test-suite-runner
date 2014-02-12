@@ -76,6 +76,8 @@ declare private variable $minimal-prefixes := map:map(
 
 declare private variable $referenced-prefixes := map:map();
 
+declare private variable $default-bnode-ref := "_:";
+declare private variable $bnode-map := map:map();
 
 (: ---------------------------------------------------------------------- :)
 
@@ -97,6 +99,7 @@ declare function rdfa-to-ttl (
 	let $origin-uri := $uri
 	let $base-uri := ($root/xhtml:head/xhtml:base/@href, $root/head/base/@href, $root/@xml:base, $uri, $default-base-uri)[1]
 	let $_ := map:clear ($referenced-prefixes)
+	let $_ := map:clear ($bnode-map)
 	let $prefix-map := context-prefix-map ($default-prefixes-map, $root/@prefix/fn:string())
 
 	return render-ttl ( parse-rdfa ($root, (), $base-uri, $prefix-map), $origin-uri, $prefix-map )
@@ -174,7 +177,7 @@ declare private function emit-prefixes (
 		let $ns-uri-from-map := map:get ($prefix-map, $prefix)
 		let $ns-uri :=
 		      if (fn:not(fn:starts-with($ns-uri-from-map,'http:') or fn:starts-with($ns-uri-from-map, 'uri')))
-		      then 
+		      then
 		          (:
 		          # Checks to see that prefixes with relative IRIs are not resolved to the document base
                   # It is resolved against the document origin, though, when the result is parsed
@@ -573,7 +576,7 @@ declare function relrev-hanging (
             then resolve-uri-or-curie ($hang-desc/@resource, $hang-desc, $base-uri, $prefix-map)
             else if ($hang-desc/@href)
             then resolve-uri-or-curie ($hang-desc/@href, $hang-desc, $base-uri, $prefix-map)
-            
+
                 else gen-blank-node-uri ($hang-desc)
 	let $subject := if ($relorrev eq "rel") then $local-subject else $local-object
 	let $object := if ($relorrev eq "rel") then $local-object else $local-subject
@@ -703,10 +706,10 @@ declare private function namespace-uri-for-prefix (
         let $uri as xs:string? := if (fn:exists ($uri) or ($prefix = "_")) then $uri else fn:namespace-uri-for-prefix ($prefix, $node)
         (:
         needs something like this, however better to add this when prefix map is generated.
-        let $test as xs:string? := 
-            if (fn:exists ($uri) and not(fn:starts-with($uri, 'http') or fn:starts-with($uri, 'uri'))) 
-            then 
-            concat($base-uri, $uri) 
+        let $test as xs:string? :=
+            if (fn:exists ($uri) and not(fn:starts-with($uri, 'http') or fn:starts-with($uri, 'uri')))
+            then
+            concat($base-uri, $uri)
             else $uri
             :)
 	    let $_ := if (fn:exists ($uri)) then map:put ($referenced-prefixes, $prefix, $uri) else ()
@@ -744,7 +747,6 @@ declare function effective-lang (
 
 (: ----------------------------------------------------------------- :)
 
-declare private variable $default-bnode-ref := "_:";
 declare private variable $default-bnode-id := "_:defbnode";
 
 declare private function resolve-curie (
@@ -769,14 +771,14 @@ declare private function resolve-curie (
 	let $suffix := fn:substring-after ($curie, ":")
 	let $result :=
 		if ($prefix = "_")
-		then if ($curie = $default-bnode-ref) then $default-bnode-id else $curie
+		then if ($curie = $default-bnode-ref) then (map:get ($bnode-map, $default-bnode-ref), $default-bnode-id)[1] else $curie
 		else if ($prefix = "" and fn:starts-with ($curie, ':'))
 		then fn:concat ("<", $dfvocab, $suffix, ">")
 		else
-		    
+
 		    if ((($ns-uri eq $dfvocab) and ($suffix = $htmlrels)) or ($prefix and $ns-uri))
 			then fn:concat ("<", $ns-uri, $suffix, ">")
-			
+
 			else ()
 
 	return $result
@@ -832,7 +834,11 @@ declare function gen-blank-node-uri (
 	$node as element()
 ) as xs:string
 {
-   concat ("_:b", $node/fn:generate-id($node))
+	let $node-id := concat ("_:b", $node/fn:generate-id ($node))
+	let $_ := if (map:get ($bnode-map, $default-bnode-ref)) then () else map:put ($bnode-map, $default-bnode-ref, $node-id)
+	let $_ := map:put ($bnode-map, $node-id, $node-id)
+
+	return $node-id
 };
 
 
