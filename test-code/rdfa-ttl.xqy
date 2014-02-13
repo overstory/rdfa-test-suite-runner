@@ -312,7 +312,9 @@ declare private function subject (
 			if ($node/@src and ($node/@property) and (($node/@content or $node/@datatype)))
 			then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
 			else
-				if ($node/@typeof and not(has-about($node/ancestor::*)))
+			    if ( $node/@typeof and not($node/parent::*) and not(has-about($node/@about)) )
+			    then wrap-uri ($base-uri)
+				else if ($node/@typeof and not(has-about($node/ancestor::*)))
 				then gen-blank-node-uri($node)
 				else
 					if (fn:exists ($parent-node))
@@ -332,11 +334,13 @@ declare private function subject-parent (
         then gen-blank-node-uri ($node)
             else if (has-about ($node/@about))
             then resolve-uri-or-curie ($node/@about, $node, $base-uri, $prefix-map)
-                else if ($node/@typeof)
-                then gen-blank-node-uri ($node)
-                    else if ($node/parent::*)
-                         then subject-parent($node/parent::*, $base-uri, $prefix-map)
-                         else wrap-uri ($base-uri)
+                else if ( $node/@typeof and not($node/parent::*) and not(has-about($node/@about)) )
+			    then wrap-uri ($base-uri)
+                    else if ($node/@typeof)
+                    then gen-blank-node-uri ($node)
+                        else if ($node/parent::*)
+                        then subject-parent($node/parent::*, $base-uri, $prefix-map)
+                             else wrap-uri ($base-uri)
 
 };
 
@@ -636,12 +640,14 @@ declare private function gen-typeof (
                    else if ($node/@src)
                         then resolve-uri-or-curie($node/@src, $node, $base-uri, $prefix-map)
                         else if (local-name($node) = ("head", "body"))
-                             then $base-uri
+                             then wrap-uri($base-uri)
                              else if (has-resource ($node/@resource) and not($node/(@rel | @rev)))
                                   then resolve-uri-or-curie($node/@resource, $node, $base-uri, $prefix-map)
                                   else if ($node/@href and not($node/(@rel | @rev)))
                                        then resolve-uri-or-curie($node/@href, $node, $base-uri, $prefix-map)
-                                       else gen-blank-node-uri($node)
+                                       else if (fn:not ($node/parent::*) and fn:not(has-about($node/@about)))
+                                       then wrap-uri($base-uri)
+                                           else gen-blank-node-uri($node)
 
     let $vocab := ancestor-vocab ($node)
 	let $object :=
