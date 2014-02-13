@@ -360,7 +360,7 @@ declare private function object (
 	else if (has-src ($node/@src) and fn:not ($node/@content) and fn:not ($node/@datatype))
 	then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
 	(: unless @about is '[]' the new object is set if @typeof is present :)
-	else if ($node/@typeof and fn:not (has-about ($node/@about)) and fn:not ($node/@about='[]'))
+	else if ($node/@typeof and fn:not (has-about ($node/@about)) and fn:not ($node/@about='[]') and fn:not($node/@about=''))
 	then gen-blank-node-uri ($node)
 
 	else quoted-string (($node/@content, fn:string ($node), "")[1])
@@ -647,7 +647,9 @@ declare private function gen-typeof (
                                        then resolve-uri-or-curie($node/@href, $node, $base-uri, $prefix-map)
                                        else if (fn:not ($node/parent::*) and fn:not(has-about($node/@about)))
                                        then wrap-uri($base-uri)
-                                           else gen-blank-node-uri($node)
+                                           else if ($node/@about = '')
+                                           then (wrap-uri ($base-uri))
+                                                else gen-blank-node-uri($node)
 
     let $vocab := ancestor-vocab ($node)
 	let $object :=
