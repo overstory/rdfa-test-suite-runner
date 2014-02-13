@@ -356,9 +356,7 @@ declare private function object (
 	else if (has-src ($node/@src) and fn:not ($node/@content) and fn:not ($node/@datatype))
 	then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
 	(: unless @about is '[]' the new object is set if @typeof is present :)
-    (: todo: how is this working now? :)
-	  else if ($node/@typeof and (fn:not (has-about ($node/@about)) and not($node/@about='[]') )) 
-	(:else if ($node/@typeof and (fn:not (has-about ($node/@about)) )):)
+	else if ($node/@typeof and fn:not (has-about ($node/@about)) and fn:not ($node/@about='[]'))
 	then gen-blank-node-uri ($node)
 
 	else quoted-string (($node/@content, fn:string ($node), "")[1])
@@ -867,7 +865,7 @@ declare private function has-about (
 	$about as xs:string
 ) as xs:boolean
 {
-	fn:not ($about = ("[]"))
+	$about and fn:not ($about = ("[]"))
 };
 
 (: function mapping will cause empty sequence result if $about is empty, which evaluates as false :)
@@ -875,21 +873,21 @@ declare private function has-resource (
 	$resource as xs:string
 ) as xs:boolean
 {
-	fn:not ($resource = ("[]"))
+	$resource and fn:not ($resource = ("[]"))
 };
 
 declare private function has-href (
 	$href as xs:string
 ) as xs:boolean
 {
-	fn:not ($href = ("[]"))
+	$href and fn:not ($href = ("[]"))
 };
 
 declare private function has-src (
 	$src as xs:string
 ) as xs:boolean
 {
-	fn:not ($src = ("[]"))
+	$src and fn:not ($src = ("[]"))
 };
 
 (: ----------------------------------------------------------------- :)
