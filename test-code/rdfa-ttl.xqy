@@ -356,8 +356,11 @@ declare private function object (
 	else if (has-src ($node/@src) and fn:not ($node/@content) and fn:not ($node/@datatype))
 	then resolve-uri-or-curie ($node/@src, $node, $base-uri, $prefix-map)
 	(: unless @about is '[]' the new object is set if @typeof is present :)
-	else if ($node/@typeof and (fn:not (has-about ($node/@about)) and has-about ($node/@about)))
+    (: todo: how is this working now? :)
+	  else if ($node/@typeof and (fn:not (has-about ($node/@about)) and not($node/@about='[]') )) 
+	(:else if ($node/@typeof and (fn:not (has-about ($node/@about)) )):)
 	then gen-blank-node-uri ($node)
+
 	else quoted-string (($node/@content, fn:string ($node), "")[1])
 };
 
