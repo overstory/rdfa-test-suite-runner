@@ -81,6 +81,11 @@ declare private variable $bnode-map := map:map();
 
 (: ---------------------------------------------------------------------- :)
 
+(:
+   FixMe: Need to revisit the logic of this code, see http://www.w3.org/TR/rdfa-syntax/#s_sequence
+   Need to pass around a richer set of context, including a stack of incomplete triples and in-scope prefixes.
+:)
+
 (: The public entry point to the module :)
 
 declare function rdfa-to-ttl (
