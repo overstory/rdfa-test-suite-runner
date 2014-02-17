@@ -359,13 +359,14 @@ declare private function evaluate-node (
 	$node as element(),
 ) as element(triple)*
 {
-	let $_ := add-prefixes ($ec, $node/@prefix)
 	let $_ := set-base-uri ($ec, $node)
 	let $_ := set-vocabulary ($ec, $node)
 	let $_ := set-language ($ec, $node)
+	let $_ := add-prefixes ($ec, $node/@prefix)
+	let $_ := step5 ($ec, $node)
+	let $_ := step6 ($ec, $node)
 	let $_ := (
 		(: Function mapping is in play here, it prevents functions being called when the attribute is not present :)
-		gen-vocab ($node/@vocab/fn:normalize-space(.), $node, $base-uri, $prefix-map),
 		gen-property ($node/@property/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
 		gen-rel ($node/@rel/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
 		gen-rev ($node/@rev/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
@@ -406,7 +407,7 @@ declare private function set-vocabulary (
 			else
 				if ($object)
 				then add-triple ($ec, $base, "<http://www.w3.org/ns/rdfa#usesVocabulary>", $vocab)
-				else add-triple ($ec, $base, "rdfa:UnresolvedCURIE", '"{$vocab}"')
+				else add-triple ($ec, $base, "rdfa:UnresolvedCURIE", "{$vocab}")
 	return ()
 };
 
@@ -419,6 +420,77 @@ declare private function set-language (
 
 	return if ($lang) then map:put ($ec, $EC-LANGUAGE, $lang) else ()
 };
+
+(:
+5: If the current element contains no @rel or @rev attribute, then the next step is to establish a value for new subject. This step has two possible alternatives.
+
+    If the current element contains the @property attribute, but does not contain either the @content or @datatype attributes, then
+    new subject is set to the resource obtained from the first match from the following rule:
+        by using the resource from @about, if present, obtained according to the section on CURIE and IRI Processing;
+        otherwise, if the element is the root element of the document, then act as if there is an empty @about present, and process it according to the rule for @about, above;
+        otherwise, if parent object is present, new subject is set to the value of parent object.
+
+    If @typeof is present then typed resource is set to the resource obtained from the first match from the following rules:
+        by using the resource from @about, if present, obtained according to the section on CURIE and IRI Processing;
+        otherwise, if the element is the root element of the document, then act as if there is an empty @about present and process it according to the previous rule;
+        otherwise,
+            by using the resource from @resource, if present, obtained according to the section on CURIE and IRI Processing;
+            otherwise, by using the IRI from @href, if present, obtained according to the section on CURIE and IRI Processing;
+            otherwise, by using the IRI from @src, if present, obtained according to the section on CURIE and IRI Processing;
+            otherwise, the value of typed resource is set to a newly created bnode.
+            The value of the current object resource is then set to the value of typed resource.
+    otherwise:
+        If the element contains an @about, @href, @src, or @resource attribute, new subject is set to the resource obtained as follows:
+            by using the resource from @about, if present, obtained according to the section on CURIE and IRI Processing;
+            otherwise, by using the resource from @resource, if present, obtained according to the section on CURIE and IRI Processing;
+            otherwise, by using the IRI from @href, if present, obtained according to the section on CURIE and IRI Processing;
+            otherwise, by using the IRI from @src, if present, obtained according to the section on CURIE and IRI Processing.
+        otherwise, if no resource is provided by a resource attribute, then the first match from the following rules will apply:
+            if the element is the root element of the document, then act as if there is an empty @about present, and process it according to the rule for @about, above;
+            otherwise, if @typeof is present, then new subject is set to be a newly created bnode;
+            otherwise, if parent object is present, new subject is set to the value of parent object. Additionally, if @property is not present then the skip element flag is set to 'true'.
+
+        Finally, if @typeof is present, set the typed resource to the value of new subject.
+:)
+declare private function step5 (
+	$ec as map:map,
+	$node as element()
+) as empty-sequence()
+{
+};
+
+(:
+6: If the current element does contain a @rel or @rev attribute, then the next step is to establish both a value for new subject and a value for current object resource:
+new subject is set to the resource obtained from the first match from the following rules:
+
+    by using the resource from @about, if present, obtained according to the section on CURIE and IRI Processing;
+
+if the @typeof attribute is present, set typed resource to new subject.
+
+If no resource is provided then the first match from the following rules will apply:
+
+    if the element is the root element of the document then act as if there is an empty @about present, and process it according to the rule for @about, above;
+    otherwise, if parent object is present, new subject is set to that.
+
+Then the current object resource is set to the resource obtained from the first match from the following rules:
+
+    by using the resource from @resource, if present, obtained according to the section on CURIE and IRI Processing;
+    otherwise, by using the IRI from @href, if present, obtained according to the section on CURIE and IRI Processing;
+    otherwise, by using the IRI from @src, if present, obtained according to the section on CURIE and IRI Processing;
+    otherwise, if @typeof is present and @about is not, use a newly created bnode.
+
+If @typeof is present and @about is not, set typed resource to current object resource.
+
+Note that final value of the current object resource will either be null (from initialization) or a full IRI or bnode.
+:)
+declare private function step6 (
+	$ec as map:map,
+	$node as element()
+) as empty-sequence()
+{
+};
+
+(: ----------------------------------------------------------------- :)
 
 declare private function subject (
 	$node as element(),
@@ -608,6 +680,7 @@ declare private function gen-rev (
 	)
 };
 
+(:
 declare private function gen-vocab (
     $vocab as xs:string,
     $node as element(),
@@ -624,6 +697,7 @@ declare private function gen-vocab (
         </triple>
    else ()
 };
+:)
 
 declare function gen-relrev-immediate (
 	$node as node(),
