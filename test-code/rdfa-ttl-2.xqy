@@ -18,16 +18,24 @@ declare variable $htmlrels :=
 
 declare variable $vocabulary-terms := ( "describedby", "license", "role" );
 
-(: Preloaded with default vocabulary prefixes.  See: http://www.w3.org/2011/rdfa-context/rdfa-1.1 :)
-declare variable $default-prefixes-map := map:map (
+declare private variable $minimum-default-prefixes := map:map(
 	<map:map xmlns:map="http://marklogic.com/xdmp/map" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-		<map:entry key="grddl"><map:value xsi:type="xs:string">http://www.w3.org/2003/g/data-view#</map:value></map:entry>
-		<map:entry key="ma"><map:value xsi:type="xs:string">http://www.w3.org/ns/ma-ont#</map:value></map:entry>
 		<map:entry key="owl"><map:value xsi:type="xs:string">http://www.w3.org/2002/07/owl#</map:value></map:entry>
-		<map:entry key="prov"><map:value xsi:type="xs:string">http://www.w3.org/ns/prov#</map:value></map:entry>
 		<map:entry key="rdf"><map:value xsi:type="xs:string">http://www.w3.org/1999/02/22-rdf-syntax-ns#</map:value></map:entry>
 		<map:entry key="rdfa"><map:value xsi:type="xs:string">http://www.w3.org/ns/rdfa#</map:value></map:entry>
 		<map:entry key="rdfs"><map:value xsi:type="xs:string">http://www.w3.org/2000/01/rdf-schema#</map:value></map:entry>
+		<map:entry key="dc"><map:value xsi:type="xs:string">http://purl.org/dc/terms/</map:value></map:entry>
+		<map:entry key="dcterms"><map:value xsi:type="xs:string">http://purl.org/dc/terms/</map:value></map:entry>
+		<map:entry key="dc11"><map:value xsi:type="xs:string">http://purl.org/dc/elements/1.1/</map:value></map:entry>
+		<map:entry key="foaf"><map:value xsi:type="xs:string">http://xmlns.com/foaf/0.1/</map:value></map:entry>
+	</map:map>
+);
+
+declare variable $additional-default-prefixes := map:map (
+	<map:map xmlns:map="http://marklogic.com/xdmp/map" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+		<map:entry key="grddl"><map:value xsi:type="xs:string">http://www.w3.org/2003/g/data-view#</map:value></map:entry>
+		<map:entry key="ma"><map:value xsi:type="xs:string">http://www.w3.org/ns/ma-ont#</map:value></map:entry>
+		<map:entry key="prov"><map:value xsi:type="xs:string">http://www.w3.org/ns/prov#</map:value></map:entry>
 		<map:entry key="rif"><map:value xsi:type="xs:string">http://www.w3.org/2007/rif#</map:value></map:entry>
 		<map:entry key="rr"><map:value xsi:type="xs:string">http://www.w3.org/ns/r2rml#</map:value></map:entry>
 		<map:entry key="sd"><map:value xsi:type="xs:string">http://www.w3.org/ns/sparql-service-description#</map:value></map:entry>
@@ -42,10 +50,6 @@ declare variable $default-prefixes-map := map:map (
 
 		<map:entry key="cc"><map:value xsi:type="xs:string">http://creativecommons.org/ns#</map:value></map:entry>
 		<map:entry key="ctag"><map:value xsi:type="xs:string">http://commontag.org/ns#</map:value></map:entry>
-		<map:entry key="dc"><map:value xsi:type="xs:string">http://purl.org/dc/terms/</map:value></map:entry>
-		<map:entry key="dcterms"><map:value xsi:type="xs:string">http://purl.org/dc/terms/</map:value></map:entry>
-		<map:entry key="dc11"><map:value xsi:type="xs:string">http://purl.org/dc/elements/1.1/</map:value></map:entry>
-		<map:entry key="foaf"><map:value xsi:type="xs:string">http://xmlns.com/foaf/0.1/</map:value></map:entry>
 		<map:entry key="gr"><map:value xsi:type="xs:string">http://purl.org/goodrelations/v1#</map:value></map:entry>
 		<map:entry key="ical"><map:value xsi:type="xs:string">http://www.w3.org/2002/12/cal/icaltzd#</map:value></map:entry>
 		<map:entry key="og"><map:value xsi:type="xs:string">http://ogp.me/ns#</map:value></map:entry>
@@ -61,18 +65,9 @@ declare variable $default-prefixes-map := map:map (
 	</map:map>
 );
 
-declare private variable $minimal-prefixes := map:map(
-	<map:map xmlns:map="http://marklogic.com/xdmp/map" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-		<map:entry key="owl"><map:value xsi:type="xs:string">http://www.w3.org/2002/07/owl#</map:value></map:entry>
-		<map:entry key="rdf"><map:value xsi:type="xs:string">http://www.w3.org/1999/02/22-rdf-syntax-ns#</map:value></map:entry>
-		<map:entry key="rdfa"><map:value xsi:type="xs:string">http://www.w3.org/ns/rdfa#</map:value></map:entry>
-		<map:entry key="rdfs"><map:value xsi:type="xs:string">http://www.w3.org/2000/01/rdf-schema#</map:value></map:entry>
-		<map:entry key="dc"><map:value xsi:type="xs:string">http://purl.org/dc/terms/</map:value></map:entry>
-		<map:entry key="dcterms"><map:value xsi:type="xs:string">http://purl.org/dc/terms/</map:value></map:entry>
-		<map:entry key="dc11"><map:value xsi:type="xs:string">http://purl.org/dc/elements/1.1/</map:value></map:entry>
-		<map:entry key="foaf"><map:value xsi:type="xs:string">http://xmlns.com/foaf/0.1/</map:value></map:entry>
-	</map:map>
-);
+(: Preloaded with default vocabulary prefixes.  See: http://www.w3.org/2011/rdfa-context/rdfa-1.1 :)
+declare variable $default-prefixes-map := $minimum-default-prefixes + $additional-default-prefixes;
+
 
 declare private variable $referenced-prefixes := map:map();
 
@@ -108,6 +103,9 @@ declare function rdfa-to-ttl (
 declare variable $EC-BASE := "base";
 declare variable $EC-ROOT-BASE-URI := "root-base-uri";
 declare variable $EC-PARENT-SUBJECT := "parent-subject";
+declare variable $EC-PARENT-OBJECT := "parent-object";
+declare variable $EC-SUBJECT := "subject";
+declare variable $EC-OBJECT := "object";
 declare variable $EC-INCOMPLETE_TRIPLES := "incomplete-triples";
 declare variable $EC-LIST-MAPPINGS := "list-mappings";
 declare variable $EC-IRI-MAPPINGS := "iri-mappings";
@@ -119,6 +117,7 @@ declare variable $EC-PARENT-CONTEXT := "parent-context";
 declare variable $EC-VOCABULARY := "vocabulary";
 declare variable $EC-DEFAULT-VOCABULARY := "default-vocabulary";
 declare variable $EC-LANGUAGE := "language";
+declare variable $EC-TYPED-RESOURCE := "typed-resource";
 
 (:
 http://www.w3.org/TR/rdfa-syntax/#s_sequence
@@ -153,11 +152,13 @@ declare private function child-eval-context (
 {
 	let $ec := $parent-ec + map:map()
 	let $_ := map:put ($ec, $EC-PARENT-CONTEXT, $parent-ec)
-	let $_ := map:put ($ec, $EC-INCOMPLETE_TRIPLES, map:gat ($parent-ec, $EC-INCOMPLETE_TRIPLES) + map:map())
-	let $_ := map:put ($ec, $EC-LIST-MAPPINGS, map:gat ($parent-ec, $EC-LIST-MAPPINGS) + map:map())
-	let $_ := map:put ($ec, $EC-TERM-MAPPINGS, map:gat ($parent-ec, $EC-TERM-MAPPINGS) + map:map())
-	let $_ := map:put ($ec, $EC-IRI-MAPPINGS, map:gat ($parent-ec, $EC-IRI-MAPPINGS) + map:map())
-	let $_ := map:put ($ec, $EC-DEFINED-PREFIXES, map:gat ($parent-ec, $EC-DEFINED-PREFIXES) + map:map())
+	let $_ := map:put ($ec, $EC-INCOMPLETE_TRIPLES, map:get ($parent-ec, map:map() + $EC-INCOMPLETE_TRIPLES))
+	let $_ := map:put ($ec, $EC-LIST-MAPPINGS, map:get ($parent-ec, map:map() + $EC-LIST-MAPPINGS))
+	let $_ := map:put ($ec, $EC-TERM-MAPPINGS, map:get ($parent-ec, map:map() + $EC-TERM-MAPPINGS))
+	let $_ := map:put ($ec, $EC-IRI-MAPPINGS, map:get ($parent-ec, map:map() + $EC-IRI-MAPPINGS))
+	let $_ := map:put ($ec, $EC-DEFINED-PREFIXES, map:get ($parent-ec, map:map() + $EC-DEFINED-PREFIXES))
+	let $_ := map:put ($ec, $EC-PARENT-SUBJECT, map:get ($parent-ec, map:map() + $EC-SUBJECT))
+	let $_ := map:put ($ec, $EC-PARENT-OBJECT, map:get ($parent-ec, map:map() + $EC-OBJECT))
 	(: referenced prefixes and generated triples maps are not copied, they are shared from parent to child :)
 	return $ec
 };
@@ -170,8 +171,8 @@ declare private function empty-eval-context (
 	let $_ := map:put ($ec, $EC-LIST-MAPPINGS, map:map())
 	let $_ := map:put ($ec, $EC-IRI-MAPPINGS, map:map())
 	let $_ := map:put ($ec, $EC-TERM-MAPPINGS, map:map())
-	let $_ := map:put ($ec, $EC-DEFINED-PREFIXES, $default-prefixes-map + map:map())
-	let $_ := map:put ($ec, $EC-REFERENCED-PREFIXES, map:map())
+	let $_ := map:put ($ec, $EC-DEFINED-PREFIXES, map:map() + $default-prefixes-map)
+	let $_ := map:put ($ec, $EC-REFERENCED-PREFIXES, map:map() + $minimum-default-prefixes)
 	let $_ := map:put ($ec, $EC-TRIPLES, map:map())
 
 	return $ec
@@ -313,6 +314,7 @@ declare private function compact-uri (
 		else $uri
 };
 
+(: FixMe: Make an inverse map rather than doing it this way :)
 declare private function find-prefix-for (
 	$referenced-prefixes as map:map,
 	$uri as xs:string
@@ -457,6 +459,41 @@ declare private function step5 (
 	$node as element()
 ) as empty-sequence()
 {
+	if (fn:exists ($node/@property) and fn:empty ($node/(@content|@datatype)))
+	then
+		let $about-subj :=
+			(
+				resolve-uri-or-curie ($node/@about, $node),
+				if ($node is $node/root()) then resolve-uri-or-curie ("", $node) else ()
+			)[1]
+		let $new-subject :=
+			(
+				$about-subj,
+				map:get ($ec, $EC-PARENT-OBJECT)
+			)[1]
+		let $_ := map:put ($ec, $EC-SUBJECT, $new-subject)
+		let $typed-resource :=
+			if (fn:exists ($node/@typeof))
+			then (
+				$about-subj,
+				resolve-uri-or-curie (($node/(@resource | @href | @src))[1], $node),
+				gen-blank-node-uri ($node)
+			)[1] else ()
+		let $_ := map:put ($ec, $EC-TYPED-RESOURCE, $new-subject)
+		return ()
+	else
+		let $new-subject :=
+			if (fn:exists ($node/(@about | @href | @src | @resource)))
+			then $new-subject := resolve-uri-or-curie (($node/(@about | @resource | @href | @src))[1], $node)
+			else (
+				resolve-uri-or-curie (($node/@resource, $node),
+				if ($node is $node/root()) then resolve-uri-or-curie ("", $node) else (),
+				if (fn:exists ($node/@typeof)) then gen-blank-node-uri ($node) else (),
+				map:get ($ec, $EC-PARENT-OBJECT)
+				(: ToDo: Need to handle skip element condition if no @property :)
+			)[1]
+		let $_ := map:put ($ec, $EC-TYPED-RESOURCE, $new-subject)
+		let $_ := map:put ($ec, $EC-SUBJECT, $new-subject)
 };
 
 (:
