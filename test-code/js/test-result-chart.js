@@ -1,7 +1,7 @@
 
 $(function ()
 {
-    Highcharts.getOptions().colors = Highcharts.map(['#00cc00', '#cccc00', '#cc0000', '#aaaaaa'], function(color) {
+    Highcharts.getOptions().colors = Highcharts.map(['#00cc00', '#cc00cc', '#cc0000', '#aaaaaa'], function(color) {
         return {
             radialGradient: { cx: 0.5, cy: 0.3, r: 0.7 },
 
