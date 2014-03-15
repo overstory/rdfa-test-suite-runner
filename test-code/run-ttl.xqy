@@ -69,8 +69,9 @@ declare function local:load-doc-from-uri (
 				()
 			}
 		}
+	let $_ := if (fn:exists ($node)) then xdmp:document-insert ($doc-uri, $node) else ()
 
-	return if (fn:exists ($node)) then xdmp:document-insert ($doc-uri, $node) else ()
+	return $node
 };
 
 declare function local:get-doc (
