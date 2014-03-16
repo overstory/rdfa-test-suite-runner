@@ -391,7 +391,7 @@ object value from @vocab
 declare private function evaluate-node (
 	$ec as map:map,
 	$node as element()
-) as element(triple)*
+) as empty-sequence()
 {
 	let $_ := set-base-uri ($ec, $node)
 	let $_ := set-vocabulary ($ec, $node)
@@ -407,17 +407,9 @@ declare private function evaluate-node (
 		if (fn:exists (map:get ($ec, $EC-CURRENT-OBJECT-RESOURCE)))
 		then step9 ($ec, $node)
 		else step10 ($ec, $node)
-
-	let $_ := (
-		(: Function mapping is in play here, it prevents functions being called when the attribute is not present :)
-(:
-		gen-property ($node/@property/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-		gen-rel ($node/@rel/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-		gen-rev ($node/@rev/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map),
-		gen-typeof ($node/@typeof/fn:normalize-space(.), $node, $parent-node, $base-uri, $prefix-map)
- :)
-	)
-	return evaluate-node (child-eval-context ($ec), $node/*)    (: function mapping here :)
+	let $_ := if ($node/@property/fn:string()) then step11 ($ec, $node) else ()
+	for $child in $node/*
+	return evaluate-node (child-eval-context ($ec), $child)
 };
 
 declare private function set-base-uri (
@@ -467,6 +459,7 @@ declare private function set-language (
 ) as empty-sequence()
 {
 	let $lang := ($node/@xml:lang/fn:string(), $node/@lang/fn:string())[1]
+let $_ := xdmp:log ("set-lang: element=" || fn:local-name($node) || ", old=" || map:get ($ec, $EC-LANGUAGE) || ", new=" || $lang)
 
 	return if ($lang) then map:put ($ec, $EC-LANGUAGE, $lang) else ()
 };
@@ -731,6 +724,93 @@ declare private function step10 (
 	return ()
 };
 
+(:
+The next step of the iteration is to establish any current property value;
+Predicates for the current property value can be set by using @property. If present, one or more resources are obtained according to the section on CURIE and IRI Processing, and then the actual literal value is obtained as follows:
+
+    as a typed literal if @datatype is present, does not have an empty value according to the section on CURIE and IRI Processing, and is not set to XMLLiteral in the vocabulary http://www.w3.org/1999/02/22-rdf-syntax-ns#.
+
+    The actual literal is either the value of @content (if present) or a string created by concatenating the value of all descendant text nodes, of the current element in turn. The final string includes the datatype IRI, as described in [RDF-SYNTAX], which will have been obtained according to the section on CURIE and IRI Processing.
+    otherwise, as a plain literal if @datatype is present but has an empty value according to the section on CURIE and IRI Processing.
+
+    The actual literal is either the value of @content (if present) or a string created by concatenating the value of all descendant text nodes, of the current element in turn.
+    otherwise, as an XML literal if @datatype is present and is set to XMLLiteral in the vocabulary http://www.w3.org/1999/02/22-rdf-syntax-ns#.
+
+    The value of the XML literal is a string created by serializing to text, all nodes that are descendants of the current element, i.e., not including the element itself, and giving it a datatype of XMLLiteral in the vocabulary http://www.w3.org/1999/02/22-rdf-syntax-ns#. The format of the resulting serialized content is as defined in Exclusive XML Canonicalization Version 1.0 [XML-EXC-C14N].
+    Note
+
+    In order to maintain maximum portability of this literal, any children of the current node that are elements MUST have the current XML namespace declarations (if any) declared on the serialized element. Since the child element node could also declare new XML namespaces, the RDFa Processor MUST be careful to merge these together when generating the serialized element definition. For avoidance of doubt, any re-declarations on the child node MUST take precedence over declarations that were active on the current node.
+    otherwise, as a plain literal using the value of @content if @content is present.
+    otherwise, if the @rel, @rev, and @content attributes are not present, as a resource obtained from one of the following:
+        by using the resource from @resource, if present, obtained according to the section on CURIE and IRI Processing;
+        otherwise, by using the IRI from @href, if present, obtained according to the section on CURIE and IRI Processing;
+        otherwise, by using the IRI from @src, if present, obtained according to the section on CURIE and IRI Processing.
+    otherwise, if @typeof is present and @about is not, the value of typed resource.
+    otherwise as a plain literal.
+
+Additionally, if there is a value for current language then the value of the plain literal should include this language information, as described in [RDF-SYNTAX]. The actual literal is either the value of @content (if present) or a string created by concatenating the text content of each of the descendant elements of the current element in document order.
+
+The current property value is then used with each predicate as follows:
+
+    If the element also includes the @inlist attribute, the current property value is added to the local list mapping as follows:
+        if the local list mapping does not contain a list associated with the predicate IRI, instantiate a new list and add to local list mappings
+        add the current property value to the list associated with the predicate IRI in the local list mapping
+    Otherwise the current property value is used to generate a triple as follows:
+
+    subject
+        new subject
+    predicate
+        full IRI
+    object
+        current property value
+
+:)
+declare private function step11 (
+	$ec as map:map,
+	$node as element()
+) as empty-sequence()
+{
+	let $new-subject := map:get ($ec, $EC-SUBJECT)
+	let $datatype-iri := resolve-uri-or-curie ($ec, $node/@datatype, $node)
+	let $datatype-exists := fn:exists ($node/@datatype)
+	let $is-xml-literal := $datatype-iri = $rdf-XMLLiteral
+	let $content-attr := $node/@content/fn:string()
+	let $element-val := $node/fn:string()
+	let $language := map:get ($ec, $EC-LANGUAGE)
+	for $property in resolve-uri-or-curie ($ec, tok ($node/@property), $node)
+	let $value :=
+		quoted-string (
+			if ($is-xml-literal)
+			then fn:string-join (for $i in $node/node() return xdmp:quote ($i), "")
+			else
+				if ($datatype-exists)
+				then ($content-attr, $node/fn:string())[1]
+				else $content-attr,
+			$datatype-iri,
+			$language
+		)
+	let $value :=
+		if (fn:exists ($value))
+		then $value
+		else
+			if (fn:empty ($node/(@rel|@rev|@content)))
+			then resolve-uri-or-curie ($ec, ($node/(@resource|@href|@src))[1], $node)
+			else ()
+	let $value :=
+		if (fn:exists ($value))
+		then $value
+		else
+			if (fn:exists ($node/@typeof) and fn:not (fn:exists ($node/@about)))
+			then map:get ($ec, $EC-TYPED-RESOURCE)
+			else quoted-string ($node/fn:string(), $datatype-iri, $language)
+	let $_ :=
+		if (fn:exists ($node/@inlist))
+		then add-to-list ($ec, $property, $value)
+		else add-triple ($ec, $new-subject, $property, $value)
+
+	return ()
+};
+
 (: ----------------------------------------------------------------- :)
 
 declare private function tok (
@@ -749,6 +829,29 @@ declare private function add-to-list (
 	let $mappings := map:get ($ec, $EC-LIST-MAPPINGS)
 	let $list := map:get ($mappings, $iri)
 	return map:put ($mappings, $iri, ($list, $resource))
+};
+
+declare private function quoted-string (
+	$s as xs:string,
+	$type as xs:string?,
+	$lang as xs:string?
+) as xs:string
+{
+	fn:string-join (
+		(
+			if (fn:matches ($s, "[^ -~'""]"))
+			then fn:concat ('"""', $s, '"""')
+			else fn:concat ('"', $s, '"'),
+
+			if ($type)
+			then ("^^", $type)
+			else
+				if ($lang)
+				then ("@", $lang)
+				else ()
+		),
+		""
+	)
 };
 
 (: ----------------------------------------------------------------- :)
@@ -827,14 +930,6 @@ declare private function object (
 };
  :)
 
-declare private function quoted-string (
-	$s as xs:string
-) as xs:string
-{
-	if (fn:matches ($s, "[^ -~'""]"))
-	then fn:concat ('"""', $s, '"""')
-	else fn:concat ('"', $s, '"')
-};
 
 (: ----------------------------------------------------------------- :)
 
@@ -1355,7 +1450,7 @@ declare private function resolve-uri-or-curie (
 {
 	let $base-uri := map:get ($ec, $EC-BASE)
 	let $prefix-map := map:get ($ec, $EC-DEFINED-PREFIXES)		(: ToDo: Should this be $EC-IRI-MAPPINGS? :)
-	return (resolve-uri ($ec, $val), resolve-curie ($ec, $val, $node))[1]
+	return (resolve-curie ($ec, $val, $node), resolve-uri ($ec, $val))[1]
 };
 
 declare function wrap-uri (
