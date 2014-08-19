@@ -375,6 +375,8 @@ declare private function quoted-string (
 	$s as xs:string
 ) as xs:string
 {
+	let $s := fn:replace ($s, '"', '\\"')
+	return
 	if (fn:matches ($s, "[^ -~'""]"))
 	then fn:concat ('"""', $s, '"""')
 	else fn:concat ('"', $s, '"')
